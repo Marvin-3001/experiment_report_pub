@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+from scipy.optimize import curve_fit
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
@@ -200,7 +201,7 @@ def save_current_figure(state):
     QMessageBox.information(state["window"], "成功", "图片已导出。")
 
 # =========================================================
-# 实验1：气象色谱流动相速度对柱效的影响
+# 实验1：离子选择性电极测定氟离子
 # =========================================================
 def plot_calibration1(state):
     table = state["table"]
@@ -316,14 +317,36 @@ def plot_point(state):
     x = arr[:, 0]
     y = arr[:, 1]
 
+    def model_func(u, A, B, C):
+        return A + B / u + C * u
+
+    popt, pcov= curve_fit(model_func, x, y)
+    A_fit, B_fit, C_fit = popt
+
+    X_fit = np.linspace(min(x), max(x), 200)
+    Y_fit = model_func(X_fit, *popt)
+
+
     figure.clear()
     ax = figure.add_subplot(111)
 
-    ax.scatter(x, y)
+    ax.scatter(x, y, color="blue", label="Data")
+
+    ax.plot(X_fit, Y_fit, label="Calibration",
+             color='black', linewidth=0.5)
+
+    ax.text(
+        0.10, 0.95,
+        f"Y = {A_fit:.3f} + {B_fit:.3f}/X + {C_fit:.3f}X",
+        transform=ax.transAxes,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+    )
+
     ax.set_title("Point Plot")
     ax.set_xlabel("u")
     ax.set_ylabel("H")
-    ax.grid(True, axis="y", alpha=0.3)
+    ax.grid(True, alpha=0.3)
 
     canvas.draw()
 
