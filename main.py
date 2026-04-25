@@ -1,14 +1,12 @@
 import sys
 import numpy as np
 from scipy.optimize import curve_fit
-
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton,
     QTableWidget, QTableWidgetItem,
-    QMessageBox, QHeaderView, QSizePolicy, QFileDialog
-)
+    QMessageBox, QHeaderView, QSizePolicy, QFileDialog)
 from PyQt6.QtGui import QShortcut, QKeySequence
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -45,7 +43,7 @@ def read_numeric_columns(table, required_cols):
         try:
             numeric_row = [float(x) for x in row_data]
         except ValueError:
-            raise ValueError(f"第 {row + 1} 行存在非数字内容，请检查。")
+            raise ValueError(f"第 {row + 1} 行存在问题，请检查。")
 
         data.append(numeric_row)
 
@@ -361,7 +359,7 @@ def main():
     # 创建主窗口
     # -------------------------
     window = QMainWindow()
-    window.setWindowTitle("实验数据绘图工具（函数版）")
+    window.setWindowTitle("实验数据绘图工具")
     window.resize(1200, 700)
 
     # 中央区域
@@ -436,7 +434,7 @@ def main():
     # -------------------------
     experiments = {
         "离子选择性电极测定氟离子": {
-            "headers": ["X", "Y"],
+            "headers": ["lgC F-", "Voltage"],
             "rows": 20,
             "cols": 2,
             "style": """
@@ -461,7 +459,7 @@ def main():
 
         "甲苯，萘的高效液相色谱分析": {
             "headers": ["Concentration", "Response"],
-            "rows": 15,
+            "rows": 20,
             "cols": 2,
             "style": """
                 QTableWidget {
@@ -485,7 +483,7 @@ def main():
 
         "气象色谱流动相速度对柱效的影响": {
             "headers": ["u", "H"],
-            "rows": 10,
+            "rows": 20,
             "cols": 2,
             "style": """
                 QTableWidget {
