@@ -198,8 +198,27 @@ def save_current_figure(state):
     state["figure"].savefig(file_path, dpi=300, bbox_inches="tight")
     QMessageBox.information(state["window"], "成功", "图片已导出。")
 
+
+def auto_add_rows(table, item):
+    # 只有当用户改动的是最后一行时，才检查是否扩展
+    if item.row() != table.rowCount() - 1:
+        return
+
+    # 最后一行只要有任意一个格子非空，补 5 行
+    last_row = table.rowCount() - 1
+    for col in range(table.columnCount()):
+        cell = table.item(last_row, col)
+        if cell and cell.text().strip():
+            table.setRowCount(table.rowCount() + 5)
+
+            for row in range(table.rowCount() - 5, table.rowCount()):
+                for c in range(table.columnCount()):
+                    if table.item(row, c) is None:
+                        table.setItem(row, c, QTableWidgetItem(""))
+            break
+
 # =========================================================
-# 实验1：离子选择性电极测定氟离子
+# 1：离子选择性电极测定氟离子
 # =========================================================
 def plot_calibration1(state):
     table = state["table"]
@@ -222,7 +241,6 @@ def plot_calibration1(state):
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
 
-    # 为了让拟合线更顺眼，按 x 排序后再画
     sort_idx = np.argsort(x)
     x_sorted = x[sort_idx]
     y_fit_sorted = y_fit[sort_idx]
@@ -231,7 +249,7 @@ def plot_calibration1(state):
     ax = figure.add_subplot(111)
 
     ax.scatter(x, y, s=40, label="Data")
-    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit")
+    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
 
     ax.set_title("Calibration Curve")
     ax.set_xlabel("lgC F-")
@@ -251,7 +269,7 @@ def plot_calibration1(state):
     canvas.draw()
 
 # =========================================================
-# 甲苯，萘的高效液相色谱分析
+# 2: 甲苯，萘的高效液相色谱分析
 # =========================================================
 def plot_calibration2(state):
     table = state["table"]
@@ -274,7 +292,6 @@ def plot_calibration2(state):
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
 
-    # 为了让拟合线更顺眼，按 x 排序后再画
     sort_idx = np.argsort(x)
     x_sorted = x[sort_idx]
     y_fit_sorted = y_fit[sort_idx]
@@ -283,7 +300,7 @@ def plot_calibration2(state):
     ax = figure.add_subplot(111)
 
     ax.scatter(x, y, s=40, label="Data")
-    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit")
+    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
 
     ax.set_title("Calibration Curve")
     ax.set_xlabel("Concentration")
@@ -304,7 +321,7 @@ def plot_calibration2(state):
 
 
 # =========================================================
-# 气象色谱流动相速度对柱效的影响
+# 3: 气象色谱流动相速度对柱效的影响
 # =========================================================
 def plot_point(state):
     table = state["table"]
@@ -314,6 +331,9 @@ def plot_point(state):
     arr = read_numeric_columns(table, 2)
     x = arr[:, 0]
     y = arr[:, 1]
+
+    if len(x) < 3:
+        raise ValueError("数据点不足")
 
     def model_func(u, A, B, C):
         return A + B / u + C * u
@@ -330,8 +350,7 @@ def plot_point(state):
 
     ax.scatter(x, y, color="blue", label="Data")
 
-    ax.plot(X_fit, Y_fit, label="Calibration",
-             color='black', linewidth=0.5)
+    ax.plot(X_fit, Y_fit, label="Fit", color='black', linewidth=1, linestyle="--")
 
     ax.text(
         0.10, 0.95,
@@ -345,6 +364,83 @@ def plot_point(state):
     ax.set_xlabel("u")
     ax.set_ylabel("H")
     ax.grid(True, alpha=0.3)
+
+    canvas.draw()
+
+
+# =========================================================
+# 4: ICP-OES的多元素同时测定, 5: 火焰原子吸收测定水样中的钾, 6: 原子荧光法测定天然水中砷和汞, 7: 吖啶橙荧光探针法测定DNA
+# =========================================================
+def plot_calibration3(state):
+    table = state["table"]
+    figure = state["figure"]
+    canvas = state["canvas"]
+
+    arr = read_numeric_columns(table, 2)
+
+    x = arr[:, 0]
+    y = arr[:, 1]
+
+    if len(x) < 2:
+        raise ValueError("标准曲线至少需要 2 个数据点。")
+
+    # 一次线性拟合
+    slope, intercept = np.polyfit(x, y, 1)
+    y_fit = slope * x + intercept
+
+    # 计算 R^2
+    ss_res = np.sum((y - y_fit) ** 2)
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
+
+    sort_idx = np.argsort(x)
+    x_sorted = x[sort_idx]
+    y_fit_sorted = y_fit[sort_idx]
+
+    figure.clear()
+    ax = figure.add_subplot(111)
+
+    ax.scatter(x, y, s=40, label="Data")
+    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
+
+    ax.set_title("Calibration Curve")
+    ax.set_xlabel("Concentration")
+    ax.set_ylabel("Signal")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+
+    eq_text = f"y = {slope:.4f}x + {intercept:.4f}\nR² = {r2:.4f}"
+    ax.text(
+        0.05, 0.95,
+        eq_text,
+        transform=ax.transAxes,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+    )
+
+    canvas.draw()
+
+
+# =========================================================
+# 7: 吖啶橙荧光探针法测定DNA-光谱图
+# =========================================================
+def plot_line(state):
+    table = state["table"]
+    figure = state["figure"]
+    canvas = state["canvas"]
+
+    arr = read_numeric_columns(table, 2)
+
+    x = arr[:, 0]
+    y = arr[:, 1]
+
+    figure.clear()
+    ax = figure.add_subplot(111)
+    ax.plot(x, y, color="black", linewidth=1, )
+
+    ax.set_title("Spectrum Plot")
+    ax.set_xlabel("Wavelength")
+    ax.set_ylabel("Intensity")
 
     canvas.draw()
 
@@ -426,12 +522,10 @@ def main():
     )
     right_layout.addWidget(canvas)
 
-    # 先放一个空坐标轴，避免一开始空白过于突兀
+    # 放置空坐标轴
     figure.add_subplot(111)
 
-    # -------------------------
-    # 每种实验的配置
-    # -------------------------
+    # 实验的配置
     experiments = {
         "离子选择性电极测定氟离子": {
             "headers": ["lgC F-", "Voltage"],
@@ -503,12 +597,130 @@ def main():
                 }
             """,
             "plot_func": plot_point
-        }
+        },
+
+        "ICP-OES多元素的同时测定": {
+            "headers": ["Concentration", "Signal"],
+            "rows": 20,
+            "cols": 2,
+            "style": """
+                QTableWidget {
+                    gridline-color: #CFCFCF;
+                    font-size: 13px;
+                    alternate-background-color: #F7F9FC;
+                    background: white;
+                }
+                QTableWidget::item {
+                    color: black;
+                }
+                QHeaderView::section {
+                    background-color: #006CBF;
+                    padding: 4px;
+                    border: 1px solid #D5DDE8;
+                    font-weight: bold;
+                }
+            """,
+            "plot_func": plot_calibration3
+        },
+
+        "火焰原子吸收测定水样中的钾": {
+            "headers": ["Concentration", "Signal"],
+            "rows": 20,
+            "cols": 2,
+            "style": """
+            QTableWidget {
+                gridline-color: #D0D0D0;
+                font-size: 13px;
+                alternate-background-color: #FFF8E8;
+                background: white;
+            }
+            QTableWidget::item {
+                color: black;
+            }
+            QHeaderView::section {
+                background-color: #127840;
+                padding: 4px;
+                border: 1px solid #D5DDE8;
+                font-weight: bold;
+            }
+        """,
+            "plot_func": plot_calibration3
+        },
+
+        "原子荧光测定天然水中的砷和汞": {
+            "headers": ["Concentration", "Signal"],
+            "rows": 20,
+            "cols": 2,
+            "style": """
+                QTableWidget {
+                    gridline-color: #CFCFCF;
+                    font-size: 13px;
+                    alternate-background-color: #F4F4F4;
+                    background: white;
+                }
+                QTableWidget::item {
+                    color: black;
+                }
+                QHeaderView::section {
+                    background-color: #595959;
+                    padding: 4px;
+                    border: 1px solid #D5DDE8;
+                    font-weight: bold;
+                }
+                """,
+            "plot_func": plot_calibration3
+        },
+
+        "吖啶橙荧光探针法测定DNA-标准曲线图": {
+            "headers": ["Concentration", "Signal"],
+            "rows": 20,
+            "cols": 2,
+            "style": """
+                QTableWidget {
+                    gridline-color: #CFCFCF;
+                    font-size: 13px;
+                    alternate-background-color: #F7F9FC;
+                    background: white;
+                }
+                QTableWidget::item {
+                    color: black;
+                }
+                QHeaderView::section {
+                    background-color: #006CBF;
+                    padding: 4px;
+                    border: 1px solid #D5DDE8;
+                    font-weight: bold;
+                    }
+                    """,
+            "plot_func": plot_calibration3
+        },
+
+        "吖啶橙荧光探针法测定DNA-光谱图": {
+            "headers": ["Wavelength", "Intensity"],
+            "rows": 20,
+            "cols": 2,
+            "style": """
+                QTableWidget {
+                    gridline-color: #D0D0D0;
+                    font-size: 13px;
+                    alternate-background-color: #FFF8E8;
+                    background: white;
+                }
+                QTableWidget::item {
+                    color: black;
+                }
+                QHeaderView::section {
+                    background-color: #127840;
+                    padding: 4px;
+                    border: 1px solid #D5DDE8;
+                    font-weight: bold;
+                        }
+                        """,
+            "plot_func": plot_line
+        },
     }
 
-    # -------------------------
-    # 状态字典：把界面里的重要对象都存起来
-    # -------------------------
+    # 状态字典
     state = {
         "window": window,
         "table": table,
@@ -527,6 +739,7 @@ def main():
     btn_plot.clicked.connect(lambda: plot_current_experiment(state))
     btn_clear.clicked.connect(lambda: clear_all_cells(table))
     btn_save.clicked.connect(lambda: save_current_figure(state))
+    table.itemChanged.connect(lambda item: auto_add_rows(table, item))
 
     # 启动时，默认加载第一个实验
     first_experiment_name = combo.currentText()
