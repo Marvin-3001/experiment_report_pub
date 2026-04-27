@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QShortcut, QKeySequence
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QSplitter
 
 
 # =========================================================
@@ -199,6 +201,8 @@ def save_current_figure(state):
     QMessageBox.information(state["window"], "成功", "图片已导出。")
 
 
+# =========================================================
+# 自动加行
 def auto_add_rows(table, item):
     # 只有当用户改动的是最后一行时，才检查是否扩展
     if item.row() != table.rowCount() - 1:
@@ -321,7 +325,7 @@ def plot_calibration2(state):
 
 
 # =========================================================
-# 3: 气象色谱流动相速度对柱效的影响
+# 3: 气相色谱流动相速度对柱效的影响
 # =========================================================
 def plot_point(state):
     table = state["table"]
@@ -344,6 +348,10 @@ def plot_point(state):
     X_fit = np.linspace(min(x), max(x), 200)
     Y_fit = model_func(X_fit, *popt)
 
+    y_pred = model_func(x, *popt)
+    ss_res = np.sum((y - y_pred) ** 2)
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
 
     figure.clear()
     ax = figure.add_subplot(111)
@@ -354,7 +362,7 @@ def plot_point(state):
 
     ax.text(
         0.10, 0.95,
-        f"Y = {A_fit:.3f} + {B_fit:.3f}/X + {C_fit:.3f}X",
+        f"H = {A_fit:.3f} + {B_fit:.3f}/u + {C_fit:.3f}u\nR² = {r2:.4f}",
         transform=ax.transAxes,
         verticalalignment="top",
         bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
@@ -462,44 +470,70 @@ def main():
     central = QWidget()
     window.setCentralWidget(central)
 
-    # 总布局：左右分栏
-    main_layout = QHBoxLayout(central)
-
-    # 左边布局：上方控制区 + 下方表格
-    left_layout = QVBoxLayout()
-    main_layout.addLayout(left_layout, 3)
-
-    # 右边布局：图像显示
-    right_layout = QVBoxLayout()
-    main_layout.addLayout(right_layout, 6)
+    # =========================
+    # 总布局：上下分栏
+    # =========================
+    root_layout = QVBoxLayout(central)
 
     # -------------------------
-    # 左上控制区
+    # 顶部控制区
     # -------------------------
-    top_layout = QHBoxLayout()
-    left_layout.addLayout(top_layout)
+    control_panel = QWidget()
+    control_panel.setMinimumHeight(60)
+    control_layout = QHBoxLayout(control_panel)
+    root_layout.addWidget(control_panel, 0)
 
     label = QLabel("实验类型：")
-    top_layout.addWidget(label)
+    control_layout.addWidget(label)
 
     combo = QComboBox()
-    top_layout.addWidget(combo)
+    control_layout.addWidget(combo)
 
     btn_plot = QPushButton("绘图")
-    top_layout.addWidget(btn_plot)
+    control_layout.addWidget(btn_plot)
 
     btn_clear = QPushButton("清空表格")
-    top_layout.addWidget(btn_clear)
+    control_layout.addWidget(btn_clear)
 
     btn_save = QPushButton("导出图片")
-    top_layout.addWidget(btn_save)
+    control_layout.addWidget(btn_save)
 
-    top_layout.addStretch()
+    control_layout.addStretch()
 
     # -------------------------
-    # 左下表格
+    # 下方表格区和图片区
+    splitter = QSplitter(Qt.Orientation.Horizontal)
+    root_layout.addWidget(splitter, 1)
+
+    # 左侧表格区
+    left_panel = QWidget()
+    left_layout = QVBoxLayout(left_panel)
+
+    # 可选：限制左边不要太宽
+    left_panel.setMaximumWidth(420)
+
+    # 右侧图像区
+    right_panel = QWidget()
+    right_layout = QVBoxLayout(right_panel)
+
+    splitter.addWidget(left_panel)
+    splitter.addWidget(right_panel)
+
+    # 初始宽度比例
+    splitter.setStretchFactor(0, 1)
+    splitter.setStretchFactor(1, 3)
+
+    # 初始像素宽度
+    splitter.setSizes([320, 880])
+
+    # -------------------------
+    # 左侧表格
     # -------------------------
     table = QTableWidget()
+
+    # 允许表格被压窄一点
+    table.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+
     left_layout.addWidget(table)
 
     # 给表格设置快捷键：Ctrl+V 粘贴，Delete 删除
@@ -575,7 +609,7 @@ def main():
             "plot_func": plot_calibration2
         },
 
-        "气象色谱流动相速度对柱效的影响": {
+        "气相色谱流动相速度对柱效的影响": {
             "headers": ["u", "H"],
             "rows": 20,
             "cols": 2,
