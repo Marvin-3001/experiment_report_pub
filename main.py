@@ -12,6 +12,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSplitter
+from types import MethodType
 
 
 # =========================================================
@@ -221,6 +222,77 @@ def auto_add_rows(table, item):
                         table.setItem(row, c, QTableWidgetItem(""))
             break
 
+
+# =========================================================
+# Enter 换行，Tab 换列功能
+# =========================================================
+def enable_excel_navigation(table):
+    old_key_press_event = table.keyPressEvent
+
+    def move_to_cell(row, col):
+        # Tab 到最后一列后，跳到下一行第一列
+        if col >= table.columnCount():
+            col = 0
+            row += 1
+
+        # Shift + Tab 到第一列前，跳到上一行最后一列
+        if col < 0:
+            row -= 1
+            col = table.columnCount() - 1
+
+        # 不允许跳到第 0 行之前
+        if row < 0:
+            row = 0
+
+        # 如果超过最后一行，自动加 5 行
+        if row >= table.rowCount():
+            old_row_count = table.rowCount()
+            table.setRowCount(table.rowCount() + 5)
+
+            for r in range(old_row_count, table.rowCount()):
+                for c in range(table.columnCount()):
+                    if table.item(r, c) is None:
+                        table.setItem(r, c, QTableWidgetItem(""))
+
+        # 如果目标格子没有 item，就补一个空 item
+        if table.item(row, col) is None:
+            table.setItem(row, col, QTableWidgetItem(""))
+
+        table.setCurrentCell(row, col)
+
+    def new_key_press_event(event):
+        key = event.key()
+        row = table.currentRow()
+        col = table.currentColumn()
+
+        # 回车：跳到下一行同一列
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                move_to_cell(row - 1, col)
+            else:
+                move_to_cell(row + 1, col)
+
+            event.accept()
+            return
+
+        # Tab：跳到下一列
+        if key == Qt.Key.Key_Tab:
+            move_to_cell(row, col + 1)
+            event.accept()
+            return
+
+        # Shift + Tab：跳到上一列
+        if key == Qt.Key.Key_Backtab:
+            move_to_cell(row, col - 1)
+            event.accept()
+            return
+
+        old_key_press_event(event)
+
+    table.keyPressEvent = MethodType(new_key_press_event, table)
+    table.setTabKeyNavigation(False)
+
+
 # =========================================================
 # 1：离子选择性电极测定氟离子
 # =========================================================
@@ -338,6 +410,9 @@ def plot_point(state):
 
     if len(x) < 3:
         raise ValueError("数据点不足")
+
+    if np.any(x < 0):
+        raise ValueError("流速 u 不能为 0 或负数")
 
     def model_func(u, A, B, C):
         return A + B / u + C * u
@@ -530,6 +605,7 @@ def main():
     # 左侧表格
     # -------------------------
     table = QTableWidget()
+    enable_excel_navigation(table)
 
     # 允许表格被压窄一点
     table.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
