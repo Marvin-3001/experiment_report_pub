@@ -13,7 +13,7 @@ from xml.sax.saxutils import escape
 from scipy.optimize import curve_fit
 from matplotlib.figure import Figure
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.pdfbase import pdfmetrics
 from PyQt6.QtGui import QShortcut, QKeySequence
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
@@ -1024,7 +1024,10 @@ def is_result_section_heading(heading):
     return "实验结果" in heading_text or "结果" in heading_text
 
 
-REPORT_TEMPLATES = load_report_templates(Path(__file__).resolve().parent / "templates")
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+PRESET_IMAGE_DIR = TEMPLATE_DIR / "image"
+
+REPORT_TEMPLATES = load_report_templates(TEMPLATE_DIR)
 
 
 # ============================================================
@@ -1281,6 +1284,30 @@ def get_image_path_by_placeholder_key(key, data):
     return ""
 
 
+def get_preset_image_path(file_name):
+    """
+    从 templates/image 文件夹读取预设图片。
+    只允许写文件名，不允许写 ../ 或子路径，避免路径混乱。
+    """
+
+    file_name = str(file_name).strip()
+
+    if not file_name:
+        raise ValueError("preset_image 缺少 file。")
+
+    image_name = Path(file_name).name
+
+    if image_name != file_name:
+        raise ValueError("preset_image 的 file 只能写图片文件名，不能写路径。")
+
+    image_path = PRESET_IMAGE_DIR / image_name
+
+    if not image_path.exists():
+        raise FileNotFoundError(f"预设图片不存在：{image_path}")
+
+    return str(image_path)
+
+
 def append_image_to_story(story, image_path, placeholder_text="图片占位符"):
     """
     将图片作为独立对象插入内容流，并设置为居中。
@@ -1310,6 +1337,63 @@ def append_image_to_story(story, image_path, placeholder_text="图片占位符")
     story.append(Spacer(1, 6))
     story.append(result_image)
     story.append(Spacer(1, 8))
+
+
+def append_preset_image_to_story(story, image_config, normal_style):
+    """
+    将 templates/image 中的预设图片插入 PDF。
+    """
+
+    file_name = image_config.get("file", "")
+    image_path = get_preset_image_path(file_name)
+
+    image_title = str(image_config.get("title", "")).strip()
+    max_width_mm = float(image_config.get("max_width_mm", 150))
+    max_height_mm = float(image_config.get("max_height_mm", 95))
+    keep_together = bool(image_config.get("keep_together", False))
+
+    image_elements = []
+
+    image_file = Path(image_path)
+
+    result_image = Image(str(image_file))
+    result_image.hAlign = "CENTER"
+
+    max_width = max_width_mm * mm
+    max_height = max_height_mm * mm
+
+    width_ratio = max_width / result_image.imageWidth
+    height_ratio = max_height / result_image.imageHeight
+    scale_ratio = min(width_ratio, height_ratio, 1)
+
+    result_image.drawWidth = result_image.imageWidth * scale_ratio
+    result_image.drawHeight = result_image.imageHeight * scale_ratio
+
+    image_elements.append(Spacer(1, 6))
+    image_elements.append(result_image)
+
+    if image_title:
+        # noinspection PyTypeChecker
+        image_title_style = ParagraphStyle(
+            name=f"{normal_style.name}_preset_image_title_center",
+            parent=normal_style,
+            alignment=TA_CENTER
+        )
+
+        image_elements.append(Spacer(1, 4))
+        image_elements.append(
+            Paragraph(
+                safe_paragraph_text(image_title),
+                image_title_style
+            )
+        )
+
+    image_elements.append(Spacer(1, 8))
+
+    if keep_together:
+        story.append(KeepTogether(image_elements))
+    else:
+        story.extend(image_elements)
 
 
 def add_result_image_to_story(story, data):
@@ -1563,6 +1647,14 @@ def add_report_sections_to_story(story, template, data, heading_style, body_styl
                             normal_style=normal_style,
                             font_name=font_name
                         )
+
+                    elif content_type == "preset_image":
+                        append_preset_image_to_story(
+                            story=story,
+                            image_config=content_item,
+                            normal_style=normal_style
+                        )
+
                     else:
                         raise ValueError(f"未知的 sections.content 对象类型：{content_type}")
 
@@ -1919,6 +2011,16 @@ def build_preview_text(template, data):
 
                     if content_type == "three_line_table":
                         lines.append(build_three_line_table_preview(content_item, data))
+
+                    elif content_type == "preset_image":
+                        image_title = str(content_item.get("title", "")).strip()
+                        file_name = str(content_item.get("file", "")).strip()
+
+                        if image_title:
+                            lines.append(f"[预设图片] {image_title}：templates/image/{file_name}")
+                        else:
+                            lines.append(f"[预设图片] templates/image/{file_name}")
+
                     else:
                         lines.append(f"[未知内容类型] {content_type}")
 
