@@ -16,6 +16,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.pdfbase import pdfmetrics
 from PyQt6.QtGui import QShortcut, QKeySequence
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -33,6 +34,10 @@ APP_STATE = {
     "picture_counter": 0,
     "generated_pictures": {}
 }
+
+CHINESE_FONT_NAME = "STSong-Light"
+WESTERN_FONT_NAME = "TimesNewRoman"
+TIMES_NEW_ROMAN_PATH = Path(r"C:\Windows\Fonts\times.ttf")
 
 
 # =========================================================
@@ -1036,34 +1041,125 @@ REPORT_TEMPLATES = load_report_templates(TEMPLATE_DIR)
 
 def register_chinese_font():
     """
-    注册 ReportLab 内置中文字体。
-
-    说明：
-    1. ReportLab 默认字体不支持中文。
-    2. STSong-Light 是 ReportLab 可直接使用的中文 CID 字体。
-    3. 这种方式不需要额外提供字体文件，适合先快速跑通程序。
+    注册 PDF 所需字体：
+    1. 中文默认字体：STSong-Light；
+    2. 西文、数字、单位符号、µ：Times New Roman。
     """
 
-    font_name = "STSong-Light"
-    pdfmetrics.registerFont(UnicodeCIDFont(font_name))
-    return font_name
+    pdfmetrics.registerFont(UnicodeCIDFont(CHINESE_FONT_NAME))
+
+    if not TIMES_NEW_ROMAN_PATH.exists():
+        raise FileNotFoundError(
+            f"没有找到 Times New Roman 字体文件：{TIMES_NEW_ROMAN_PATH}\n"
+            "请检查该路径是否存在，或把 TIMES_NEW_ROMAN_PATH 改为你电脑上的 times.ttf 实际路径。"
+        )
+
+    pdfmetrics.registerFont(
+        TTFont(WESTERN_FONT_NAME, str(TIMES_NEW_ROMAN_PATH))
+    )
+
+    return CHINESE_FONT_NAME
+
+
+def is_western_text_char(char):
+    """
+    判断字符是否应使用 Times New Roman。
+
+    包括：
+    1. 英文字母；
+    2. 数字；
+    3. 常见 ASCII 符号；
+    4. µ；
+    5. 常见单位/数学符号。
+    """
+
+    if char in "µμ×°℃℉±−‰":
+        return True
+
+    code_point = ord(char)
+
+    # ASCII：英文字母、数字、英文标点等
+    if 0x0021 <= code_point <= 0x007E:
+        return True
+
+    # Latin-1 Supplement：包括 µ、°、± 等
+    if 0x00A0 <= code_point <= 0x00FF:
+        return True
+
+    return False
+
+
+def escape_text_with_mixed_fonts(text):
+    """
+    转义文本，同时把西文、数字和 µ 等字符包进 Times New Roman。
+    中文字符保持段落默认字体 STSong-Light。
+    """
+
+    result = []
+    western_run = []
+
+    def flush_western_run():
+        if western_run:
+            western_text = "".join(western_run)
+            result.append(
+                f'<font name="{WESTERN_FONT_NAME}">{escape(western_text)}</font>'
+            )
+            western_run.clear()
+
+    for char in str(text):
+        if is_western_text_char(char):
+            western_run.append(char)
+        else:
+            flush_western_run()
+            result.append(escape(char))
+
+    flush_western_run()
+
+    return "".join(result)
 
 
 def safe_paragraph_text(text):
     """
-    将普通文本转换为 ReportLab Paragraph 可以识别的安全文本。
-    主要处理：
-    1. 转义特殊符号，避免 <、>、& 等符号影响 PDF 生成；
-    2. 将换行符转换为 <br/>，保证 PDF 中能正常换行。
+    将普通文本转换为 ReportLab Paragraph 可识别的安全文本。
+
+    额外支持：
+    1. 中文默认使用 STSong-Light；
+    2. 西文、数字、µ 等自动切换为 Times New Roman；
+    3. 科学计数法写法：[sci=-3]；
+    4. 换行符转换为 <br/>。
     """
 
     if text is None:
         text = ""
 
     text = str(text)
-    text = escape(text)
-    text = text.replace("\n", "<br/>")
-    return text
+
+    pattern = r"\[sci=([+-]?\d+)]"
+
+    parts = []
+    last_index = 0
+
+    for match in re.finditer(pattern, text):
+        before_text = text[last_index:match.start()]
+        exponent = match.group(1)
+
+        parts.append(escape_text_with_mixed_fonts(before_text))
+        parts.append(
+            f'<super><font name="{WESTERN_FONT_NAME}">{escape(exponent)}</font></super>'
+        )
+
+        last_index = match.end()
+
+    parts.append(escape_text_with_mixed_fonts(text[last_index:]))
+
+    rendered_text = "".join(parts)
+    rendered_text = rendered_text.replace("\n", "<br/>")
+
+    return rendered_text
+
+
+def safe_paragraph_text_with_scientific_notation(text):
+    return safe_paragraph_text(text)
 
 
 def safe_body_paragraph_text(text):
@@ -1439,7 +1535,7 @@ def add_text_with_manual_indent_to_story(story, text, body_style):
             paragraph_text = paragraph
             paragraph_style = body_style
 
-        story.append(Paragraph(safe_body_paragraph_text(paragraph_text), paragraph_style))
+        story.append(Paragraph(safe_paragraph_text_with_scientific_notation(paragraph_text), paragraph_style))
 
 
 def build_three_line_table(table_config, data, normal_style, font_name):
@@ -1472,7 +1568,7 @@ def build_three_line_table(table_config, data, normal_style, font_name):
             cell_text = render_template_text(str(cell), data)
             rendered_row.append(
                 Paragraph(
-                    safe_paragraph_text(cell_text),
+                    safe_paragraph_text_with_scientific_notation(cell_text),
                     normal_style
                 )
             )
