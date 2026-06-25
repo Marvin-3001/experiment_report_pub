@@ -1,0 +1,153 @@
+{
+    "template_name": "原子荧光法测定天然水中的砷和汞",
+    "title": "原子荧光法测定天然水中的砷和汞",
+
+    "basic_info_keys": [
+        "experiment_name",
+        "student_name",
+        "student_id",
+        "experiment_date",
+        "teacher_name"
+    ],
+
+    "fields": [
+        {
+            "key": "experiment_name",
+            "label": "实验名称",
+            "type": "line",
+            "required": true,
+            "default": "原子荧光法测定天然水中的砷和汞"
+        },
+        {
+            "key": "student_name",
+            "label": "学生姓名",
+            "type": "line",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "student_id",
+            "label": "学号",
+            "type": "line",
+            "required": false,
+            "default": ""
+        },
+        {
+            "key": "teacher_name",
+            "label": "指导教师",
+            "type": "line",
+            "required": false,
+            "default": ""
+        },
+        {
+            "key": "experiment_date",
+            "label": "实验日期",
+            "type": "date",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "problem_analysis",
+            "label": "五、实验结果处理与分析",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "question_1",
+            "label": "六、思考题1",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "question_2",
+            "label": "六、思考题2",
+            "type": "text",
+            "required": true,
+            "default": ""
+        }
+    ],
+
+    "sections":[
+        {
+            "heading": "一、实验目的",
+            "content": [
+                "1.掌握原子荧光光谱仪的使用方法。",
+                "2.熟悉样品的化学前处理技术。"
+            ]
+        },
+        {
+            "heading":"二、实验原理",
+            "content":[
+                "[indent=21]天然水中Hg、As在强还原剂硼氢化钠（钾）的作用下生成气态氢化物，与大量的基体物质分离，基本消除了各种干扰，然后用原子荧光光谱法测定。原子荧光光谱仪中氢化物发生—石英炉原子化装置示意图如图1所示。",
+                {
+                    "type":"preset_image",
+                    "file":"3-1.png",
+                    "title":"图1 氢化物发生—石英炉原子化装置示意图",
+                    "max_width_mm": 140,
+                    "max_height_mm": 90,
+                    "keep_together": true
+                },
+                "[indent=21]试样溶液与硼氢化钠（由试剂滴管6）在氢化物反应器1中进行反应，生成气态氢化物，惰性气体（一般用氩气）经导管2将氢化物吹出，气态氢化物经气体排出管3并被玻璃丝绵硅胶干燥球脱水干燥，进入石英管原子化器7被原子化，完成分析测定。"
+            ]
+        },
+        {
+            "heading":"三、实验仪器与试剂",
+            "content":[
+                "1.仪器",
+                "AFS-2002型双道原子荧光光谱仪；砷、汞高强度空心阴极灯。",
+                {
+                    "type":"three_line_table",
+                    "title":"表1 实验工作条件如下",
+                    "headers":["元素","负高压（V）","灯电流（mA）","原子化器高度（mm）","原子化温度（℃）","屏蔽气流量（mL/min）","载气流量（mL/min）","空白判别值"],
+                    "rows":[
+                        ["As","280~300","55~60","8","200","1000","250~400","5"],
+                        ["Hg","260~280","25~30","8","200","1000","250~400","8"]
+                    ],
+                    "col_widths_mm":[30,20,20,20,30,30,30,30],
+                    "keep_together": true
+                },
+                "[indent=21]读数时间：10s；延迟时间：1s。",
+                "[indent=21]样品进样量：0.5mL；测量方式：标准曲线法。",
+                "[indent=21]读数方式：峰面积。",
+                "2.试剂",
+                "[indent=21]砷标准溶液：1000 μg/L。",
+                "[indent=21]汞标准溶液：100 μg/L。",
+                "[indent=21]预还原剂：3%抗坏血酸+3%硫脲混合溶液。",
+                "[indent=21]还原剂：1.5%硼氢化钾溶液（含0.5% KOH）。",
+                "[indent=21]1% HNO3溶液，% HCl溶液。 "
+            ]
+        },
+        {
+            "heading":"四、实验步骤",
+            "content":[
+                "1.单道原子荧光光谱法测砷",
+                "[indent=21]取1个25.00mL容量瓶，准确加入水样10.00mL、预还原剂5mL，用1%HNO3溶液稀释至刻度，摇匀，半小时后上机测定。",
+                "[indent=21]取6个25.00mL容量瓶，分别准确加入0、0.50、1.00、1.50、2.00、2.50mL砷标准溶液，每个容量瓶中都加入5mL预还原剂，用1%HNO3溶液稀释至刻度，摇匀，半小时后上机测定。（该标准系列的砷浓度依次为0、20、40、60、80、100μg/L）",
+                "2.单道原子荧光光谱法测汞",
+                "[indent=21]将水样准确定量分取100mL于150mL烧杯中，加入优级纯硝酸5mL，在电热板上蒸发浓缩至小体积，转移至10.00mL比色管中，摇匀，备测。",
+                "[indent=21]另取6个25.00mL容量瓶，分别准确加入0、0.50、1.00、1.50、2.00、2.50mL汞标准溶液，用1%HNO3溶液稀释至刻度，摇匀，备测。（该标准系列汞浓度依次为0、2、4、6、8、10μg/L）",
+                "[indent=21]在选定的仪器工作条件下，分别测定砷、汞的标准系列和水样的荧光强度，计算水样中砷、汞的含量（μg/L）。"
+            ]
+        },
+        {
+
+        },
+        {
+            "heading":"五、实验结果处理与分析",
+            "content":[
+                "[indent=21]{{problem_analysis}}"
+            ]
+        },
+        {
+            "heading":"六、思考题",
+            "content":[
+                "1.简述原子荧光光谱法的分析原理。",
+                "[indent=21]{{question_1}}",
+                "2.原子荧光法测定砷、汞时应注意哪些问题？怎样来保证分析结果的准确度？在原子荧光法测定砷时，为什么要加入预还原剂？为什么溶液配制好后需要放置半小时再测定？",
+                "[indent=21]{{question_2}}"
+            ]
+         }
+    ]
+}

@@ -1,0 +1,171 @@
+{
+  "template_name": "ICP-OES的多元素同时测定",
+  "title": "ICP-OES的多元素同时测定",
+
+  "basic_info_keys": [
+    "experiment_name",
+    "student_name",
+    "student_id",
+    "experiment_date",
+    "teacher_name"
+  ],
+
+  "fields": [
+    {
+      "key": "experiment_name",
+      "label": "实验名称",
+      "type": "line",
+      "required": true,
+      "default": "ICP-OES的多元素同时测定"
+    },
+    {
+      "key": "student_name",
+      "label": "学生姓名",
+      "type": "line",
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "student_id",
+      "label": "学号",
+      "type": "line",
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "teacher_name",
+      "label": "指导教师",
+      "type": "line",
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "experiment_date",
+      "label": "实验日期",
+      "type": "date",
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "problem_analysis",
+      "label": "五、实验结果处理与分析",
+      "type": "text",
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "question_1",
+      "label": "六、思考题1",
+      "type": "text",
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "question_2",
+      "label": "六、思考题2",
+      "type": "text",
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "question_3",
+      "label": "六、思考题3",
+      "type": "text",
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "question_4",
+      "label": "六、思考题4",
+      "type": "text",
+      "required": true,
+      "default": ""
+    }
+  ],
+
+  "sections": [
+    {
+      "heading": "一、实验目的",
+      "content": [
+        "1.了解 ICP-OES 工作的基本原理和特点。",
+        "2.了解 ICP-OES 的仪器结构。",
+        "3.掌握多元素同时测定的试验方法及操作。"
+      ]
+    },
+    {
+      "heading": "二、实验原理",
+      "content": [
+        "[indent=21]样品由载气（氩气）带入雾化系统进行雾化后，以气溶胶形式进入等离子体，在高温和惰性气氛中被充分蒸发、原子化，基态电子在高温下激发，越迁至高能态（激发态） ，处于激发态的原子不稳定，电子自发回到基态，并发出特征辐射，特征辐射进入仪器光学系统，经过过滤和分光后，到达检测器从而被检测。根据特征辐射峰面积表征计数强度，进行样品的定量分析。根绝特征辐射的波长进行定性分析。"
+      ]
+    },
+    {
+      "heading": "三、实验试剂与仪器",
+      "content": [
+        "仪器：美国PE公司5300V型号ICP-OES。",
+        {
+          "type": "three_line_table",
+          "title": "表1 ICP-OES的测定条件",
+          "headers": ["条件名称", "工作条件（单位）"],
+          "rows": [
+            ["等离子功率", "1.2kW"],
+            ["等离子体气流速", "18L/min"],
+            ["辅助气流速", "0.5L/min"],
+            ["载气流速", "1L/min"],
+            ["冲洗时间", "20(s)"],
+            ["重复次数", "3"]
+          ],
+          "col_widths_mm": [60, 50],
+          "keep_together": false
+        },
+        {
+          "type": "three_line_table",
+          "title": "表2 Ca、Mg、Fe的测定波长",
+          "headers": ["元素名称", "选择波长（nm）"],
+          "rows": [
+            ["Ca", "317.93"],
+            ["Mg", "279.55"],
+            ["Fe", "259.94"]
+          ],
+          "col_widths_mm": [60, 50],
+          "keep_together": true
+        }
+      ]
+    },
+    {
+      "heading": "四、实验步骤",
+      "content": [
+        "1.熟悉高频电感耦合等离子体光谱仪的结构，工作原理和使用方法。",
+        "2.配制标准溶掖和样品溶液",
+        "（1）配制标准贮备液(均为1000ug/ml)： 准确称取2.4973g在110℃烘干过的碳酸钙，用少量盐酸溶解后，用二次蒸馏水稀释至1L，备用。 准确称取1.0000g高纯金属镁，用少量的6mo1盐酸溶解后，用二次蒸馏水稀释至1L备用。准确称取1.0000g高纯金属铁，在30m1盐酸中溶解，再加数毫升的硝酸，然后用二次水稀释至1L。",
+        "（2）配制标准溶液：取5只250m1的容量瓶，分别加入 0、0.1、1、5、10ml 的 1000ug/ml的钙贮备液，再分别加入0、0.1、0.5、2.5、5mI的1000ug/ml的镁贮备液，然后分别加入0、0.01、0.05、0.1、1m1的铁贮备液和5ml硝酸。用二次水稀释至刻度，摇匀。",
+        "（3）配制样品溶液：取 200ml水样于250m1容量瓶中，加入5mI硝酸，用二次去离子水稀释至刻度，摇匀。 ",
+        "3.设置分析参数：打开计算机，打开软件。用ICP程序建立分析任务名称。在ICP软件程序中，输入分析元素Ca、Mg、Fe波长(nm)分别为 317.93、279.55、259.94nm，同时在程序中输入三种元素标准溶液的名称、单位和浓度值。选择冲洗时间、积分时间等值。 ",
+        "4.点燃等离子体：等离子体最好由老师点燃，或在老师的指导下由学生点燃。",
+        "5.校正波长 ",
+        "6.操作条件选择：选择合适的入射功率、观察高度、裁气流量。",
+        "7.制作工作曲线",
+        "8.样品测定：首先测定标准溶液的谱线强度，并把测定结果存贮将样品溶液用蠕动泵输入等离子体中，运行程序进行测量。计算机将测量结果处理后，以浓度形式显示出来，将浓度值记录。",
+        "9.测定结束后：用蒸馏水引入等离子体中清洗雾室及炬管。然后熄灭等离子体，关闭计算机，关闭氩气钢瓶。 "
+      ]
+    },
+    {
+      "heading": "五、实验结果处理与分析",
+      "content": [
+        "[indent=21]{{problem_analysis}}"
+      ]
+    },
+    {
+      "heading": "六、思考题",
+      "content": [
+        "1.简述ICP-OES的定性、定量分析的原理及仪器构造？",
+        "[indent=21]{{question_1}}",
+        "2.简述电感耦合等离子光源的工作原理及特点？",
+        "[indent=21]{{question_2}}",
+        "3.标准空白与试剂空白的意义？",
+        "[indent=21]{{question_3}}",
+        "4.发射光谱定性分析时，为什么各元素的谱线需要选择几条？定量分析时如何决定最后选用哪条谱线进行分析？",
+        "[indent=21]{{question_4}}"
+      ]
+    }
+  ]
+}

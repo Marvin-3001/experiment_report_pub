@@ -1,0 +1,151 @@
+{
+    "template_name": "水样中钾的原子吸收法测定",
+    "title": "水样中钾的原子吸收法测定",
+
+    "basic_info_keys": [
+        "experiment_name",
+        "student_name",
+        "student_id",
+        "experiment_date",
+        "teacher_name"
+    ],
+
+    "fields": [
+        {
+            "key": "experiment_name",
+            "label": "实验名称",
+            "type": "line",
+            "required": true,
+            "default": "水样中钾的原子吸收法测定"
+        },
+        {
+            "key": "student_name",
+            "label": "学生姓名",
+            "type": "line",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "student_id",
+            "label": "学号",
+            "type": "line",
+            "required": false,
+            "default": ""
+        },
+        {
+            "key": "teacher_name",
+            "label": "指导教师",
+            "type": "line",
+            "required": false,
+            "default": ""
+        },
+        {
+            "key": "experiment_date",
+            "label": "实验日期",
+            "type": "date",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "problem_analysis",
+            "label": "五、实验结果处理与分析",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "question_1",
+            "label": "六、思考题1",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "question_2",
+            "label": "六、思考题2",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "question_3",
+            "label": "六、思考题3",
+            "type": "text",
+            "required": true,
+            "default": ""
+        }
+    ],
+
+    "sections": [
+        {
+            "heading": "一、实验目的",
+            "content": [
+                "1.了解钾的火焰原子吸收光谱测定技术。",
+                "2.熟悉标准曲线法和标准加入法的应用。"
+                ]
+        },
+        {
+            "heading": "二、实验原理",
+            "content": [
+                "与原子发射光谱分析原理相似，基态原子受外界能量（如热能、电能或光能）作用时，最外层电子将吸收能量产生跃迁。当基态原子受外界光源作用时，基态原子吸收的能量与辐射光的频率成正比，即：△E=E2-E1=hυ=hc/λ",
+                "原子吸收光谱法就是基于从光源辐射出待测元素的特征谱线的光，通过试样的蒸汽时，被蒸汽中待测元素的基态原子所吸收，根据辐射特征谱线光减弱的程度，测定试样中待测元素含量的一种仪器分析方法。",
+                "钾是易电离元素，在高温原子化状态下极易电离。实验中应严格控制分析条件，消除其电离干扰。"
+            ]
+        },
+        {
+            "heading":"三、仪器与试剂",
+            "content":[
+                "1.仪器",
+                "[indent=21]AA7001型原子吸收分光光度计（东西电子）钾空心阴极灯。",
+                {
+                    "type": "three_line_table",
+                    "title": "表1 仪器工作条件",
+                    "headers": ["元素灯", "波长（nm）", "灯电流（mA）", "狭缝宽度（mm）", "空气流量（L/min）", "乙炔流量（L/min）", "燃烧器高度（mm）"],
+                    "rows":[
+                        ["k", "766.5", "3", "1.0", "7", "1.0", "15"]
+                    ]
+                },
+                "[indent=21]AA800型原子吸收分光光度计（PE公司）、钾空心阴极灯。",
+                {
+                    "type": "three_line_table",
+                    "title": "表2 仪器工作条件",
+                    "headers": ["元素灯", "波长（nm）", "灯电流（mA）", "狭缝宽度（mm）", "空气流量（L/min）", "乙炔流量（L/min）", "燃烧器高度（mm）"],
+                    "rows":[
+                        ["k", "766.5", "8", "0.7H", "17", "2.0", "15"]
+                    ]
+                },
+                "2.试剂",
+                "钾标准溶液，50mg/L; NaCl溶液，50g/L；HCl溶液，1% "
+            ]
+        },
+        {
+            "heading":"四、实验步骤",
+            "content":[
+                "1.标准加入法测钾",
+                "[indent=21]取四个25.00mL容量瓶，分别加入5mL水样，然后从第二个容量瓶开始分别加入0.5、1、2mL钾标准溶液，每个容量瓶都用1%HCl溶液稀释至刻度，摇匀，在仪器工作条件下测定各溶液的吸光度。",
+                "[indent=21]利用钾的浓度和测定所获的吸光度，绘制吸光度-浓度工作曲线，然后将曲线外推至浓度轴，交点OX即为所求未知液的浓度。根据查出的浓度，计算出水样中钾的含量（mg/L)。",
+                "2.标准工作曲线法测钾",
+                "[indent=21]取水样10.00mL于25.00mL容量瓶中，加入1mL的NaCl溶液，用1%的HCl溶液稀释到刻度，摇匀备测。",
+                "[indent=21]取四个25.00mL容量瓶，分别加入0、0.5、1、2mL钾标准溶液，每个容量瓶都加入1mL的NaCl溶液，并用1%的HCl溶液稀释到刻度，该标准系列的钾浓度依次为0、1.0、2.0、4.0mg/L。",
+                "在选定的仪器工作条件下，分别测定水样和标准系列的吸光度。用标准系列及其获得的相应吸光度绘制出标准工作曲线后，从工作曲线上查出水样的浓度，然后计算水样中钾的含量（mg/L）。"
+            ]
+        },
+        {
+            "heading":"五、实验结果处理与分析",
+            "content":[
+                "[indent=21]{{problem_analysis}}"
+            ]
+        },
+        {
+            "heading":"六、思考题",
+            "content":[
+                "1.比较两种分析方法测定钾的结果，说出本次实验测定天然水水中哪种方法得出的结果可靠性大？ ",
+                "[indent=21]{{question_1}}",
+                "2.简述标准工作曲线法和标准加入法的原理、特点及应用范围。",
+                "[indent=21]{{question_2}}",
+                "如果在测定中出现标准曲线弯曲的现象，这条工作曲线还可以使用吗？为什么？有那些因素可能导致工作曲线发生弯曲？ ",
+                "[indent=21]{{question_3}}"
+            ]
+        }
+    ]
+}
