@@ -85,8 +85,15 @@ def read_numeric_columns(table, required_cols):
 # =========================================================
 def paste_from_clipboard(table):
     """
-    支持从 Excel 复制多行多列后，直接粘贴到 QTableWidget
+    支持从 Excel 复制多行多列后，直接粘贴到 QTableWidget。
+    可通过表格属性控制：
+    table.report_allow_expand_rows = True / False
+    table.report_allow_expand_cols = True / False
+    默认：
+    允许扩展行；
+    不允许扩展列。
     """
+
     clipboard = QApplication.clipboard()
     text = clipboard.text()
 
@@ -96,11 +103,15 @@ def paste_from_clipboard(table):
     start_row = table.currentRow()
     start_col = table.currentColumn()
 
-    # 如果当前没有选中单元格，就默认从左上角开始
     if start_row < 0:
         start_row = 0
     if start_col < 0:
         start_col = 0
+
+    readonly_cells = getattr(table, "report_readonly_cells", set())
+
+    allow_expand_rows = getattr(table, "report_allow_expand_rows", True)
+    allow_expand_cols = getattr(table, "report_allow_expand_cols", False)
 
     rows = text.strip().split("\n")
 
@@ -111,20 +122,57 @@ def paste_from_clipboard(table):
             row = start_row + r
             col = start_col + c
 
-            # 如果粘贴的数据超出当前表格范围，就自动扩展
+            # 行超出范围
             if row >= table.rowCount():
-                table.setRowCount(row + 1)
-            if col >= table.columnCount():
-                table.setColumnCount(col + 1)
+                if allow_expand_rows:
+                    old_row_count = table.rowCount()
+                    table.setRowCount(row + 1)
 
-            table.setItem(row, col, QTableWidgetItem(value.strip()))
+                    for new_row in range(old_row_count, table.rowCount()):
+                        for new_col in range(table.columnCount()):
+                            if table.item(new_row, new_col) is None:
+                                table.setItem(new_row, new_col, QTableWidgetItem(""))
+                else:
+                    continue
+
+            # 列超出范围
+            if col >= table.columnCount():
+                if allow_expand_cols:
+                    old_col_count = table.columnCount()
+                    table.setColumnCount(col + 1)
+
+                    for existing_row in range(table.rowCount()):
+                        for new_col in range(old_col_count, table.columnCount()):
+                            if table.item(existing_row, new_col) is None:
+                                table.setItem(existing_row, new_col, QTableWidgetItem(""))
+                else:
+                    continue
+
+            # 跳过只读单元格
+            if (row, col) in readonly_cells:
+                continue
+
+            item = table.item(row, col)
+
+            if item is None:
+                table.setItem(row, col, QTableWidgetItem(value.strip()))
+            else:
+                item.setText(value.strip())
 
 
 # =========================================================
 # 清空选中的单元格
 # =========================================================
 def clear_selected_cells(table):
+
+    readonly_cells = getattr(table, "report_readonly_cells", set())
     for item in table.selectedItems():
+        row = item.row()
+        col = item.column()
+
+        if (row, col) in readonly_cells:
+            continue
+
         item.setText("")
 
 
@@ -663,6 +711,11 @@ def build_plot_window():
 
     # 左侧表格
     table = QTableWidget()
+
+    # 绘图区表格：允许粘贴时增加行，不允许增加列
+    table.report_allow_expand_rows = True
+    table.report_allow_expand_cols = False
+
     enable_excel_navigation(table)
 
     # 允许表格被压窄一点
@@ -1162,22 +1215,6 @@ def safe_paragraph_text_with_scientific_notation(text):
     return safe_paragraph_text(text)
 
 
-def safe_body_paragraph_text(text):
-    """
-    只把中文/英文/数字混排附近的空格变成不换行空格。
-    避免中文实验报告中出现“用 ICP / 程序”这种异常断行。
-    """
-    safe_text = safe_paragraph_text(text)
-
-    safe_text = re.sub(
-        r"(?<=[\u4e00-\u9fffA-Za-z0-9]) (?=[\u4e00-\u9fffA-Za-z0-9])",
-        "\u00A0",
-        safe_text
-    )
-
-    return safe_text
-
-
 def remove_extra_blank_lines(text):
     """
     清理模板文本中多余的空行。
@@ -1658,6 +1695,144 @@ def append_three_line_table_to_story(story, table_config, data, normal_style, fo
         story.extend(table_elements)
 
 
+def get_field_config_by_key(template, field_key):
+    """
+    根据 fields 中的 key 找到完整字段配置。
+    """
+
+    for field in template.get("fields", []):
+        if field.get("key") == field_key:
+            return field
+
+    raise ValueError(f"没有找到字段配置：{field_key}")
+
+
+def append_grid_table_to_story(story, table_config, template, data, normal_style, font_name):
+    """
+    将填写区 grid_table 字段插入 PDF。
+
+    支持：
+    1. 自定义列宽；
+    2. 自定义行高；
+    3. 合并单元格；
+    4. 固定单元格和可填写单元格混排。
+    """
+
+    field_key = str(table_config.get("field_key", "")).strip()
+
+    if not field_key:
+        raise ValueError("grid_table 缺少 field_key。")
+
+    field_config = get_field_config_by_key(template, field_key)
+
+    table_data = data.get(field_key)
+
+    if not isinstance(table_data, list) or not table_data:
+        raise ValueError(f"grid_table 找不到有效表格数据：{field_key}")
+
+    row_count = len(table_data)
+    col_count = len(table_data[0])
+
+    for row_index, row in enumerate(table_data):
+        if len(row) != col_count:
+            raise ValueError(
+                f"grid_table 的第 {row_index + 1} 行列数不一致。"
+            )
+
+    elements = []
+
+    title = str(table_config.get("title", "")).strip()
+
+    if title:
+        # noinspection PyTypeChecker
+        title_style = ParagraphStyle(
+            name=f"{normal_style.name}_{field_key}_title_center",
+            parent=normal_style,
+            alignment=TA_CENTER
+        )
+
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph(safe_paragraph_text(title), title_style))
+        elements.append(Spacer(1, 4))
+
+    rendered_table_data = []
+
+    for row in table_data:
+        rendered_row = []
+
+        for cell in row:
+            rendered_row.append(
+                Paragraph(
+                    safe_paragraph_text(str(cell)),
+                    normal_style
+                )
+            )
+
+        rendered_table_data.append(rendered_row)
+
+    col_widths_mm = expand_dimension_values(
+        table_config.get("col_widths_mm"),
+        col_count,
+        150 / col_count
+    )
+
+    col_widths = [width * mm for width in col_widths_mm]
+
+    row_heights_config = table_config.get("row_heights_mm")
+
+    if row_heights_config is None:
+        row_heights = None
+    else:
+        row_heights_mm = expand_dimension_values(
+            row_heights_config,
+            row_count,
+            10
+        )
+        row_heights = [height * mm for height in row_heights_mm]
+
+    pdf_table = Table(
+        rendered_table_data,
+        colWidths=col_widths,
+        rowHeights=row_heights,
+        hAlign="CENTER"
+    )
+
+    table_style_commands = [
+        ("FONTNAME", (0, 0), (-1, -1), font_name),
+        ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+
+    for span in field_config.get("spans", []):
+        row = int(span["row"])
+        col = int(span["col"])
+        rowspan = int(span.get("rowspan", 1))
+        colspan = int(span.get("colspan", 1))
+
+        start = (col, row)
+        end = (col + colspan - 1, row + rowspan - 1)
+
+        # noinspection PyTypeChecker
+        table_style_commands.append(("SPAN", start, end))
+
+    pdf_table.setStyle(TableStyle(table_style_commands))
+
+    elements.append(pdf_table)
+    elements.append(Spacer(1, 8))
+
+    keep_together = bool(table_config.get("keep_together", False))
+
+    if keep_together:
+        story.append(KeepTogether(elements))
+    else:
+        story.extend(elements)
+
+
 def add_content_with_picture_placeholders_to_story(story, content, data, body_style):
     """
     按正文中的图片占位符顺序加入文字和图片。
@@ -1751,6 +1926,16 @@ def add_report_sections_to_story(story, template, data, heading_style, body_styl
                             normal_style=normal_style
                         )
 
+                    elif content_type == "grid_table":
+                        append_grid_table_to_story(
+                            story=story,
+                            table_config=content_item,
+                            template=template,
+                            data=data,
+                            normal_style=normal_style,
+                            font_name=font_name
+                        )
+
                     else:
                         raise ValueError(f"未知的 sections.content 对象类型：{content_type}")
 
@@ -1835,6 +2020,172 @@ def generate_pdf(output_path, template, data):
     doc.build(story)
 
 
+def expand_dimension_values(raw_values, expected_count, default_value):
+    """
+    展开行高、列宽配置。
+
+    支持：
+    1. 直接写数字；
+    2. 使用 {"repeat": 数量, "value": 数值} 批量重复。
+    """
+
+    if raw_values is None:
+        return [default_value] * expected_count
+
+    result = []
+
+    for item in raw_values:
+        if isinstance(item, dict):
+            repeat_count = int(item["repeat"])
+            value = float(item["value"])
+
+            for _ in range(repeat_count):
+                result.append(value)
+        else:
+            result.append(float(item))
+
+    if len(result) != expected_count:
+        raise ValueError(
+            f"尺寸配置数量不正确：需要 {expected_count} 个，实际得到 {len(result)} 个。"
+        )
+
+    return result
+
+
+def create_grid_table_input_widget(field):
+    """
+    创建可编辑网格表格输入控件。
+
+    支持：
+    1. 固定行列；
+    2. 默认单元格文本；
+    3. 只读单元格；
+    4. 合并单元格；
+    5. 自定义填写区列宽、行高；
+    6. 从 Excel 粘贴。
+    """
+
+    rows = int(field.get("rows", 2))
+    cols = int(field.get("cols", 2))
+
+    container = QWidget()
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+
+    table = QTableWidget()
+    table.setRowCount(rows)
+    table.setColumnCount(cols)
+
+    table.horizontalHeader().setVisible(False)
+    table.verticalHeader().setVisible(False)
+
+    for row in range(rows):
+        for col in range(cols):
+            table.setItem(row, col, QTableWidgetItem(""))
+
+    # 设置默认单元格
+    readonly_cells = set()
+
+    for cell in field.get("cells", []):
+        row = int(cell["row"])
+        col = int(cell["col"])
+        text = str(cell.get("text", ""))
+
+        if row < 0 or row >= rows or col < 0 or col >= cols:
+            raise ValueError(f"grid_table 默认单元格超出范围：row={row}, col={col}")
+
+        item = QTableWidgetItem(text)
+
+        if bool(cell.get("readonly", False)):
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            readonly_cells.add((row, col))
+
+        table.setItem(row, col, item)
+
+    # 设置合并单元格
+    for span in field.get("spans", []):
+        row = int(span["row"])
+        col = int(span["col"])
+        rowspan = int(span.get("rowspan", 1))
+        colspan = int(span.get("colspan", 1))
+
+        table.setSpan(row, col, rowspan, colspan)
+
+    # 设置填写区列宽
+    col_widths_px = expand_dimension_values(
+        field.get("col_widths_px"),
+        cols,
+        70
+    )
+
+    for col, width in enumerate(col_widths_px):
+        table.setColumnWidth(col, int(width))
+
+    # 设置填写区行高
+    row_heights_px = expand_dimension_values(
+        field.get("row_heights_px"),
+        rows,
+        34
+    )
+
+    for row, height in enumerate(row_heights_px):
+        table.setRowHeight(row, int(height))
+
+    table.setMinimumHeight(min(360, sum(int(x) for x in row_heights_px) + 40))
+    table.setSizePolicy(
+        QSizePolicy.Policy.Expanding,
+        QSizePolicy.Policy.Fixed
+    )
+
+    enable_excel_navigation(table)
+
+    button_layout = QHBoxLayout()
+
+    paste_button = QPushButton("粘贴 Excel 数据")
+    clear_button = QPushButton("清空可编辑单元格")
+
+    def clear_editable_cells():
+        for row_t in range(table.rowCount()):
+            for col_t in range(table.columnCount()):
+                if (row_t, col_t) in readonly_cells:
+                    continue
+
+                item_t = table.item(row_t, col_t)
+
+                if item_t is None:
+                    table.setItem(row_t, col_t, QTableWidgetItem(""))
+                else:
+                    item_t.setText("")
+
+    paste_button.clicked.connect(lambda: paste_from_clipboard(table))
+    clear_button.clicked.connect(clear_editable_cells)
+
+    button_layout.addWidget(paste_button)
+    button_layout.addWidget(clear_button)
+    button_layout.addStretch()
+
+    layout.addLayout(button_layout)
+    layout.addWidget(table)
+
+    shortcut_paste = QShortcut(QKeySequence("Ctrl+V"), table)
+    shortcut_delete = QShortcut(QKeySequence("Delete"), table)
+
+    shortcut_paste.activated.connect(lambda: paste_from_clipboard(table))
+    shortcut_delete.activated.connect(lambda: clear_selected_cells(table))
+
+    table.report_readonly_cells = readonly_cells
+    table.report_allow_expand = False
+
+    table.report_readonly_cells = readonly_cells
+    table.report_allow_expand_rows = False
+    table.report_allow_expand_cols = False
+
+    container.report_grid_table_widget = table
+    container.report_grid_table_spans = field.get("spans", [])
+
+    return container
+
+
 # ============================================================
 # 4. GUI 输入控件相关函数
 # ============================================================
@@ -1873,6 +2224,9 @@ def create_input_widget(field):
 
         return widget
 
+    if field_type == "grid_table":
+        return create_grid_table_input_widget(field)
+
     if field_type == "image":
         container = QWidget()
         layout = QHBoxLayout(container)
@@ -1904,6 +2258,30 @@ def create_input_widget(field):
     return widget
 
 
+def get_grid_table_widget_data(table):
+    """
+    读取 QTableWidget 的所有单元格内容。
+    返回二维列表。
+    """
+
+    data = []
+
+    for row in range(table.rowCount()):
+        row_data = []
+
+        for col in range(table.columnCount()):
+            item = table.item(row, col)
+
+            if item is None:
+                row_data.append("")
+            else:
+                row_data.append(item.text().strip())
+
+        data.append(row_data)
+
+    return data
+
+
 def get_widget_value(widget):
     """
     从不同类型的输入控件中读取用户输入内容。
@@ -1920,6 +2298,9 @@ def get_widget_value(widget):
 
     if hasattr(widget, "line_edit"):
         return widget.line_edit.text().strip()
+
+    if hasattr(widget, "report_grid_table_widget"):
+        return get_grid_table_widget_data(widget.report_grid_table_widget)
 
     return ""
 
@@ -1971,6 +2352,24 @@ def rebuild_form(form_layout, input_widgets, template):
         form_layout.addRow(QLabel(label_text), widget)
 
 
+def is_empty_form_value(value):
+    """
+    判断表单值是否为空。
+    支持：
+    1. 普通字符串；
+    2. 二维表格。
+    """
+
+    if isinstance(value, list):
+        for row in value:
+            for cell in row:
+                if str(cell).strip():
+                    return False
+        return True
+
+    return str(value).strip() == ""
+
+
 def collect_form_data(template, input_widgets, check_required=True):
     """
     收集用户在 GUI 中输入的数据。
@@ -1997,7 +2396,7 @@ def collect_form_data(template, input_widgets, check_required=True):
 
         data[key] = value
 
-        if check_required and required and value.strip() == "":
+        if check_required and required and is_empty_form_value(value):
             missing_fields.append(label)
 
     if missing_fields:
@@ -2116,6 +2515,15 @@ def build_preview_text(template, data):
                             lines.append(f"[预设图片] {image_title}：templates/image/{file_name}")
                         else:
                             lines.append(f"[预设图片] templates/image/{file_name}")
+
+                    elif content_type == "grid_table":
+                        field_key = str(content_item.get("field_key", "")).strip()
+                        title = str(content_item.get("title", "")).strip()
+
+                        if title:
+                            lines.append(f"[填写表格] {title}：{field_key}")
+                        else:
+                            lines.append(f"[填写表格] {field_key}")
 
                     else:
                         lines.append(f"[未知内容类型] {content_type}")
