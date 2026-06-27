@@ -85,8 +85,15 @@ def read_numeric_columns(table, required_cols):
 # =========================================================
 def paste_from_clipboard(table):
     """
-    支持从 Excel 复制多行多列后，直接粘贴到 QTableWidget
+    支持从 Excel 复制多行多列后，直接粘贴到 QTableWidget。
+    可通过表格属性控制：
+    table.report_allow_expand_rows = True / False
+    table.report_allow_expand_cols = True / False
+    默认：
+    允许扩展行；
+    不允许扩展列。
     """
+
     clipboard = QApplication.clipboard()
     text = clipboard.text()
 
@@ -96,11 +103,15 @@ def paste_from_clipboard(table):
     start_row = table.currentRow()
     start_col = table.currentColumn()
 
-    # 如果当前没有选中单元格，就默认从左上角开始
     if start_row < 0:
         start_row = 0
     if start_col < 0:
         start_col = 0
+
+    readonly_cells = getattr(table, "report_readonly_cells", set())
+
+    allow_expand_rows = getattr(table, "report_allow_expand_rows", True)
+    allow_expand_cols = getattr(table, "report_allow_expand_cols", False)
 
     rows = text.strip().split("\n")
 
@@ -111,20 +122,57 @@ def paste_from_clipboard(table):
             row = start_row + r
             col = start_col + c
 
-            # 如果粘贴的数据超出当前表格范围，就自动扩展
+            # 行超出范围
             if row >= table.rowCount():
-                table.setRowCount(row + 1)
-            if col >= table.columnCount():
-                table.setColumnCount(col + 1)
+                if allow_expand_rows:
+                    old_row_count = table.rowCount()
+                    table.setRowCount(row + 1)
 
-            table.setItem(row, col, QTableWidgetItem(value.strip()))
+                    for new_row in range(old_row_count, table.rowCount()):
+                        for new_col in range(table.columnCount()):
+                            if table.item(new_row, new_col) is None:
+                                table.setItem(new_row, new_col, QTableWidgetItem(""))
+                else:
+                    continue
+
+            # 列超出范围
+            if col >= table.columnCount():
+                if allow_expand_cols:
+                    old_col_count = table.columnCount()
+                    table.setColumnCount(col + 1)
+
+                    for existing_row in range(table.rowCount()):
+                        for new_col in range(old_col_count, table.columnCount()):
+                            if table.item(existing_row, new_col) is None:
+                                table.setItem(existing_row, new_col, QTableWidgetItem(""))
+                else:
+                    continue
+
+            # 跳过只读单元格
+            if (row, col) in readonly_cells:
+                continue
+
+            item = table.item(row, col)
+
+            if item is None:
+                table.setItem(row, col, QTableWidgetItem(value.strip()))
+            else:
+                item.setText(value.strip())
 
 
 # =========================================================
 # 清空选中的单元格
 # =========================================================
 def clear_selected_cells(table):
+
+    readonly_cells = getattr(table, "report_readonly_cells", set())
     for item in table.selectedItems():
+        row = item.row()
+        col = item.column()
+
+        if (row, col) in readonly_cells:
+            continue
+
         item.setText("")
 
 
@@ -663,6 +711,11 @@ def build_plot_window():
 
     # 左侧表格
     table = QTableWidget()
+
+    # 绘图区表格：允许粘贴时增加行，不允许增加列
+    table.report_allow_expand_rows = True
+    table.report_allow_expand_cols = False
+
     enable_excel_navigation(table)
 
     # 允许表格被压窄一点
@@ -1160,22 +1213,6 @@ def safe_paragraph_text(text):
 
 def safe_paragraph_text_with_scientific_notation(text):
     return safe_paragraph_text(text)
-
-
-def safe_body_paragraph_text(text):
-    """
-    只把中文/英文/数字混排附近的空格变成不换行空格。
-    避免中文实验报告中出现“用 ICP / 程序”这种异常断行。
-    """
-    safe_text = safe_paragraph_text(text)
-
-    safe_text = re.sub(
-        r"(?<=[\u4e00-\u9fffA-Za-z0-9]) (?=[\u4e00-\u9fffA-Za-z0-9])",
-        "\u00A0",
-        safe_text
-    )
-
-    return safe_text
 
 
 def remove_extra_blank_lines(text):
@@ -2136,6 +2173,13 @@ def create_grid_table_input_widget(field):
     shortcut_paste.activated.connect(lambda: paste_from_clipboard(table))
     shortcut_delete.activated.connect(lambda: clear_selected_cells(table))
 
+    table.report_readonly_cells = readonly_cells
+    table.report_allow_expand = False
+
+    table.report_readonly_cells = readonly_cells
+    table.report_allow_expand_rows = False
+    table.report_allow_expand_cols = False
+
     container.report_grid_table_widget = table
     container.report_grid_table_spans = field.get("spans", [])
 
@@ -2471,6 +2515,15 @@ def build_preview_text(template, data):
                             lines.append(f"[预设图片] {image_title}：templates/image/{file_name}")
                         else:
                             lines.append(f"[预设图片] templates/image/{file_name}")
+
+                    elif content_type == "grid_table":
+                        field_key = str(content_item.get("field_key", "")).strip()
+                        title = str(content_item.get("title", "")).strip()
+
+                        if title:
+                            lines.append(f"[填写表格] {title}：{field_key}")
+                        else:
+                            lines.append(f"[填写表格] {field_key}")
 
                     else:
                         lines.append(f"[未知内容类型] {content_type}")
