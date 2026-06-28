@@ -353,19 +353,24 @@ def enable_excel_navigation(table):
         if row < 0:
             row = 0
 
-        # 如果超过最后一行，自动加 5 行
+        # 如果超过最后一行，根据表格属性决定是否自动加行
         if row >= table.rowCount():
-            old_row_count = table.rowCount()
-            previous_block_state = table.blockSignals(True)
-            try:
-                table.setRowCount(old_row_count + 5)
+            allow_expand_rows = getattr(table, "report_allow_expand_rows", True)
 
-                for r in range(old_row_count, old_row_count + 5):
-                    for c in range(table.columnCount()):
-                        if table.item(r, c) is None:
-                            table.setItem(r, c, QTableWidgetItem(""))
-            finally:
-                table.blockSignals(previous_block_state)
+            if allow_expand_rows:
+                old_row_count = table.rowCount()
+                previous_block_state = table.blockSignals(True)
+                try:
+                    table.setRowCount(old_row_count + 5)
+
+                    for r in range(old_row_count, old_row_count + 5):
+                        for c in range(table.columnCount()):
+                            if table.item(r, c) is None:
+                                table.setItem(r, c, QTableWidgetItem(""))
+                finally:
+                    table.blockSignals(previous_block_state)
+            else:
+                row = table.rowCount() - 1
 
         # 如果目标格子没有 item，就补一个空 item
         if table.item(row, col) is None:
@@ -524,7 +529,7 @@ def plot_point(state):
     if len(x) < 3:
         raise ValueError("数据点不足")
 
-    if np.any(x < 0):
+    if np.any(x <= 0):
         raise ValueError("流速 u 不能为 0 或负数")
 
     def model_func(u, A, B, C):
@@ -1126,7 +1131,7 @@ def is_western_text_char(char):
     5. 常见单位/数学符号。
     """
 
-    if char in "µμ×°℃℉±−‰":
+    if char in "µμ×°℃℉±−‰λΛΔαβγδθπσΩω":
         return True
 
     code_point = ord(char)
@@ -1174,12 +1179,12 @@ def escape_text_with_mixed_fonts(text):
 def safe_paragraph_text(text):
     """
     将普通文本转换为 ReportLab Paragraph 可识别的安全文本。
-
-    额外支持：
+    支持：
     1. 中文默认使用 STSong-Light；
-    2. 西文、数字、µ 等自动切换为 Times New Roman；
-    3. 科学计数法写法：[sci=-3]；
-    4. 换行符转换为 <br/>。
+    2. 西文、数字、µ、λ、Δ 等自动切换为 Times New Roman；
+    3. 上标：[sup=-3]；
+    4. 下标：[sub=pc]；
+    5. 换行符转换为 <br/>。
     """
 
     if text is None:
@@ -1187,19 +1192,27 @@ def safe_paragraph_text(text):
 
     text = str(text)
 
-    pattern = r"\[sci=([+-]?\d+)]"
+    inline_pattern = r"\[(sup|sub)=([^\]]+)]"
 
     parts = []
     last_index = 0
 
-    for match in re.finditer(pattern, text):
+    for match in re.finditer(inline_pattern, text):
         before_text = text[last_index:match.start()]
-        exponent = match.group(1)
+        marker_type = match.group(1)
+        marker_text = match.group(2)
 
         parts.append(escape_text_with_mixed_fonts(before_text))
-        parts.append(
-            f'<super><font name="{WESTERN_FONT_NAME}">{escape(exponent)}</font></super>'
-        )
+
+        if marker_type == "sup":
+            parts.append(
+                f"<super>{escape_text_with_mixed_fonts(marker_text)}</super>"
+            )
+
+        elif marker_type == "sub":
+            parts.append(
+                f"<sub>{escape_text_with_mixed_fonts(marker_text)}</sub>"
+            )
 
         last_index = match.end()
 
@@ -1209,10 +1222,6 @@ def safe_paragraph_text(text):
     rendered_text = rendered_text.replace("\n", "<br/>")
 
     return rendered_text
-
-
-def safe_paragraph_text_with_scientific_notation(text):
-    return safe_paragraph_text(text)
 
 
 def remove_extra_blank_lines(text):
@@ -1572,7 +1581,7 @@ def add_text_with_manual_indent_to_story(story, text, body_style):
             paragraph_text = paragraph
             paragraph_style = body_style
 
-        story.append(Paragraph(safe_paragraph_text_with_scientific_notation(paragraph_text), paragraph_style))
+        story.append(Paragraph(safe_paragraph_text(paragraph_text), paragraph_style))
 
 
 def build_three_line_table(table_config, data, normal_style, font_name):
@@ -1605,7 +1614,7 @@ def build_three_line_table(table_config, data, normal_style, font_name):
             cell_text = render_template_text(str(cell), data)
             rendered_row.append(
                 Paragraph(
-                    safe_paragraph_text_with_scientific_notation(cell_text),
+                    safe_paragraph_text(cell_text),
                     normal_style
                 )
             )
@@ -2111,6 +2120,21 @@ def create_grid_table_input_widget(field):
 
         table.setSpan(row, col, rowspan, colspan)
 
+        # 合并区域内，除左上角外，其余隐藏单元格都禁止编辑和粘贴
+        for rr in range(row, row + rowspan):
+            for cc in range(col, col + colspan):
+                if (rr, cc) == (row, col):
+                    continue
+
+                readonly_cells.add((rr, cc))
+
+                item = table.item(rr, cc)
+                if item is None:
+                    item = QTableWidgetItem("")
+                    table.setItem(rr, cc, item)
+
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
     # 设置填写区列宽
     col_widths_px = expand_dimension_values(
         field.get("col_widths_px"),
@@ -2172,9 +2196,6 @@ def create_grid_table_input_widget(field):
 
     shortcut_paste.activated.connect(lambda: paste_from_clipboard(table))
     shortcut_delete.activated.connect(lambda: clear_selected_cells(table))
-
-    table.report_readonly_cells = readonly_cells
-    table.report_allow_expand = False
 
     table.report_readonly_cells = readonly_cells
     table.report_allow_expand_rows = False
