@@ -2061,6 +2061,54 @@ def expand_dimension_values(raw_values, expected_count, default_value):
     return result
 
 
+def plain_inline_markup_for_gui(text):
+    """
+    仅用于 GUI 显示：
+    将 [sub=...] / [sup=...] 去掉格式标记，显示为普通文本。
+    例如：
+    E[sub=pc]       -> Epc
+    I[sub=pa]       -> Ipa
+    10[sup=-3]      -> 10⁻³
+    """
+
+    if text is None:
+        return ""
+
+    text = str(text)
+
+    superscript_map = str.maketrans({
+        "0": "⁰",
+        "1": "¹",
+        "2": "²",
+        "3": "³",
+        "4": "⁴",
+        "5": "⁵",
+        "6": "⁶",
+        "7": "⁷",
+        "8": "⁸",
+        "9": "⁹",
+        "+": "⁺",
+        "-": "⁻",
+        "=": "⁼",
+        "(": "⁽",
+        ")": "⁾"
+    })
+
+    def replace_match(match):
+        marker_type = match.group(1)
+        marker_text = match.group(2)
+
+        if marker_type == "sup":
+            return marker_text.translate(superscript_map)
+
+        if marker_type == "sub":
+            return marker_text
+
+        return marker_text
+
+    return re.sub(r"\[(sup|sub)=([^]]+)]", replace_match, text)
+
+
 def create_grid_table_input_widget(field):
     """
     创建可编辑网格表格输入控件。
@@ -2103,10 +2151,12 @@ def create_grid_table_input_widget(field):
         if row < 0 or row >= rows or col < 0 or col >= cols:
             raise ValueError(f"grid_table 默认单元格超出范围：row={row}, col={col}")
 
-        item = QTableWidgetItem(text)
+        display_text = plain_inline_markup_for_gui(text)
+        item = QTableWidgetItem(display_text)
 
         if bool(cell.get("readonly", False)):
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            item.setData(Qt.ItemDataRole.UserRole, text)
             readonly_cells.add((row, col))
 
         table.setItem(row, col, item)
@@ -2282,7 +2332,8 @@ def create_input_widget(field):
 def get_grid_table_widget_data(table):
     """
     读取 QTableWidget 的所有单元格内容。
-    返回二维列表。
+    如果单元格有 UserRole 原始文本，则优先使用原始文本；
+    否则使用 GUI 中显示的文本。
     """
 
     data = []
@@ -2296,7 +2347,12 @@ def get_grid_table_widget_data(table):
             if item is None:
                 row_data.append("")
             else:
-                row_data.append(item.text().strip())
+                raw_text = item.data(Qt.ItemDataRole.UserRole)
+
+                if raw_text is not None:
+                    row_data.append(str(raw_text).strip())
+                else:
+                    row_data.append(item.text().strip())
 
         data.append(row_data)
 
@@ -2365,10 +2421,12 @@ def rebuild_form(form_layout, input_widgets, template):
         widget = create_input_widget(field)
         input_widgets[key] = widget
 
+        display_label = plain_inline_markup_for_gui(label)
+
         if required:
-            label_text = f"{label} *"
+            label_text = f"{display_label} *"
         else:
-            label_text = label
+            label_text = display_label
 
         form_layout.addRow(QLabel(label_text), widget)
 
@@ -2556,6 +2614,7 @@ def build_preview_text(template, data):
                         has_result_image_placeholder = True
 
                     preview_content = strip_manual_indent_markers(rendered_content)
+                    preview_content = plain_inline_markup_for_gui(preview_content)
                     lines.append(preview_content)
 
         else:
@@ -2565,6 +2624,7 @@ def build_preview_text(template, data):
                 has_result_image_placeholder = True
 
             preview_content = strip_manual_indent_markers(rendered_content)
+            preview_content = plain_inline_markup_for_gui(preview_content)
             lines.append(preview_content)
 
         if is_result_section_heading(heading):
