@@ -1,0 +1,123 @@
+{
+    "template_name":"甲苯，萘的高效液相色谱分析",
+    "title":"甲苯，萘的高效液相色谱分析",
+
+    "basic_info_keys": [
+        "experiment_name",
+        "student_name",
+        "student_id",
+        "experiment_date",
+        "teacher_name"
+    ],
+
+    "fields": [
+        {
+            "key": "experiment_name",
+            "label": "实验名称",
+            "type": "line",
+            "required": true,
+            "default": "甲苯，萘的高效液相色谱分析"
+        },
+        {
+            "key": "student_name",
+            "label": "学生姓名",
+            "type": "line",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "student_id",
+            "label": "学号",
+            "type": "line",
+            "required": false,
+            "default": ""
+        },
+        {
+            "key": "teacher_name",
+            "label": "指导教师",
+            "type": "line",
+            "required": false,
+            "default": ""
+        },
+        {
+            "key": "experiment_date",
+            "label": "实验日期",
+            "type": "date",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "exp_purpose",
+            "label": "一、实验目的",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "problem_analysis",
+            "label": "五、实验结果处理与分析",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "question_1",
+            "label": "六、思考题1",
+            "type": "text",
+            "required": true,
+            "default": ""
+        }
+    ],
+
+    "sections": [
+        {
+            "heading": "一、实验目的",
+            "content":[
+                "{{exp_purpose}}"
+            ]
+        },
+        {
+            "heading":"二、实验原理",
+            "content":[
+                "[indent=21]C[sub=18]对混合液中不同的物质有有不同的吸附性，则在其间有不同的分配系数，使保留时间不同。极性大的保留时间短，先随载液流出，反之则后流出，使混合样品分离成但组分，先进入检测器被检测。",
+                "[indent=21]样品采用YWG-C[sub=18]反相液相色谱柱进行分离，以紫外检测器进行检测、分别以甲苯和萘标准系列溶液的色谱峰面积对它们的浓度做工作曲线、再根据样品中的甲苯和萘面积，由工作曲线算出其相应浓度。"
+            ]
+        },
+        {
+            "heading":"三、实验仪器与试剂",
+            "content":[
+                "仪器：LC-20AB 液相色谱仪(日本岛津公司)；色谱柱：YWG-C18(10 µm)，4.0mm×150 mm；平头微量注射器。",
+                "试剂：1、甲醇(色谱纯)；二次蒸馏水；",
+                "[indent=21]2、甲苯标准溶液；萘标准溶液；"
+            ]
+        },
+        {
+            "heading":"四、实验步骤",
+            "content":[
+                "1.按操作说明书使色谱仪正常工作，色谱条件为",
+                "[indent=21]柱温：室温 ",
+                "[indent=21]流动相：甲醇/水＝80/20 (V/V) ",
+                "[indent=21]流动相流量：1.0 mL/min ",
+                "[indent=21]检测波长：190 nm ",
+                "2.绘制工作曲线：待液相色谱仪基线平直后，分别注入甲苯和萘标准系列溶液30µL，重复二次．要求二次所得的色谱峰面积基本一致，否则，继续进样，直至每次进样色谱峰面积重复，记下峰面积和保留时间。",
+                "3.样品测定：分别注入样品溶液30µL。根据保留时间确定样品中甲苯和萘的色谱峰的位置。再重复二次，记下甲苯和萘色谱峰面积。",
+                "4.实验结束后，接要求关好仪器。"
+            ]
+        },
+        {
+            "heading":"五、实验结果处理与分析",
+            "content":[
+                "{{problem_analysis}}"
+            ]
+        },
+        {
+            "heading":"六、思考题",
+            "content":[
+                "[indent=21]1.用标准曲线法定量的优缺点是什么？",
+                "[indent=21]{{question_1}}",
+                "[indent=21]2.若标准曲线用浓度对峰高作图，能给出准确结果吗？与本实验的标准曲线相比何者优越？为什么？",
+                "[indent=21]{{question_2}}"
+            ]
+        }
+    ]
+}

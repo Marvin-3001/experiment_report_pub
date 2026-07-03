@@ -54,6 +54,84 @@
             "default":""
         },
         {
+            "key":"1_table",
+            "label":"激光光谱结果",
+            "type":"grid_table",
+            "required":false,
+            "rows":2,
+            "cols":23,
+            "col_widths_px":[50,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30],
+            "row_widths_px":[30,30],
+            "cells":[
+                {"row":0,"col":0,"text":"λ[sub=ex]/nm","readonly":true},
+                {"row":1,"col":0,"text":"F","readonly":true}
+            ]
+        },
+        {
+            "key":"λex",
+            "label":"λex=",
+            "type":"text",
+            "required":true,
+            "default":""
+        },
+        {
+            "key":"2_table",
+            "label":"发射光谱结果",
+            "type":"grid_table",
+            "required":false,
+            "rows":2,
+            "cols":23,
+            "col_widths_px":[50,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30],
+            "row_widths_px":[30,30],
+            "cells":[
+                {"row":0,"col":0,"text":"λ[sub=em]/nm","readonly":true},
+                {"row":1,"col":0,"text":"F","readonly":true}
+            ]
+        },
+        {
+            "key":"λem",
+            "label":"λem=",
+            "type":"text",
+            "required":true,
+            "default":""
+        },
+        {
+            "key":"standard_curve",
+            "label":"标准曲线的绘制及未知液的测定",
+            "type":"grid_table",
+            "required":false,
+            "rows":3,
+            "cols":9,
+            "col_widths_px":[70,40,40,40,40,40,40,40,40],
+            "row_widths_px":[40,30,30],
+            "cells":[
+                {"row":0,"col":0,"text":"V[sub=标液或样品](mL)","readonly":true},
+                {"row":1,"col":0,"text":"C[sub=DNA](µg/mL)","readonly":true},
+                {"row":2,"col":0,"text":"F","readonly":true}
+            ]
+        },
+        {
+            "key":"fac",
+            "label":"回归曲线方程：",
+            "type":"text",
+            "required":true,
+            "default":""
+        },
+        {
+            "key":"para",
+            "label":"相关系数：",
+            "type":"text",
+            "required":true,
+            "default":""
+        },
+        {
+            "key":"C",
+            "label":"样品溶液DNA浓度",
+            "type":"text",
+            "required":true,
+            "default":""
+        },
+        {
             "key":"question_1",
             "label":"六、思考题1",
             "type":"text",
@@ -93,19 +171,19 @@
         {
             "heading":"三、仪器与试剂",
             "content":[
-                "[indent=21]日立F-7000荧光光度计，石英比色皿，烧杯、容量瓶、移液管若干。吖啶橙（3.3×10[sci=-5] mol/L，鱼精子DNA（50 µg/mL，Tris-HCl缓冲溶液（pH=7.4，十二烷基苯磺酸钠（SDBS，0.01mol/L）（现配现用)。未知样品。"
+                "[indent=21]日立F-7000荧光光度计，石英比色皿，烧杯、容量瓶、移液管若干。吖啶橙（3.3×10[sup=-5] mol/L，鱼精子DNA（50 µg/mL，Tris-HCl缓冲溶液（pH=7.4，十二烷基苯磺酸钠（SDBS，0.01mol/L）（现配现用)。未知样品。"
             ]
         },
         {
             "heading":"四、实验步骤",
             "content":[
                 "1.发射光谱和激发光谱的绘制",
-                "[indent=21]取一25.00mL容量瓶，加入Tris-HCl缓冲溶液（pH=7.4）5.0mL，3.3×10[sci=-5]mol/L AO溶液1.25 mL，0.01 mol/L SDBS溶液2.0 mL（现配现用），50 µg/mL DNA标准溶液1.00 mL，用超纯水定容。",
+                "[indent=21]取一25.00mL容量瓶，加入Tris-HCl缓冲溶液（pH=7.4）5.0mL，3.3×10[sup=-5]mol/L AO溶液1.25 mL，0.01 mol/L SDBS溶液2.0 mL（现配现用），50 µg/mL DNA标准溶液1.00 mL，用超纯水定容。",
                 "[indent=21](1)在常规窗口选择测量方式，输入测试信息；",
                 "[indent=21](2)在仪器条件窗口设置激发和发射起始波长、终止波长、扫描速度、激发和发射狭缝宽度、负高压、响应速度等信息；",
                 "[indent=21](3)在确定的条件下固定激发波长扫描发射波长，固定发射波长扫描激发波长，得到最佳的激发和发射波长。",
                 "2.标准曲线的绘制",
-                "[indent=21]于一系列25.00mL容量瓶中加入Tris-HCl缓冲溶液（pH=7.4）5.0 mL，3.3×10[sci=-5]mol/L AO溶液1.25mL，0.01 mol/L SDBS溶液0.50 mL，一定量的50 µg/mL DNA 标准溶液（线性范围0-4.0µg/mL，用超纯水定容后，在优选的激发波长和发射波长下测量其荧光强度，以荧光强度对DNA的浓度绘制工作曲线。",
+                "[indent=21]于一系列25.00mL容量瓶中加入Tris-HCl缓冲溶液（pH=7.4）5.0 mL，3.3×10[sup=-5]mol/L AO溶液1.25mL，0.01 mol/L SDBS溶液0.50 mL，一定量的50 µg/mL DNA 标准溶液（线性范围0-4.0µg/mL，用超纯水定容后，在优选的激发波长和发射波长下测量其荧光强度，以荧光强度对DNA的浓度绘制工作曲线。",
                 "3. 样品中DNA测定",
                 "[indent=21]取1.00mL的未知样品溶液，其余同标准曲线操作，测定样品的荧光强度，计算样品中DNA的浓度。"
             ]
@@ -113,7 +191,36 @@
         {
             "heading":"五、实验结果处理与分析",
             "content":[
-                "{{problem_analysis}}待开发"
+                "1.绘制激光光谱和发射光谱",
+                {
+                    "type":"grid_table",
+                    "field_key":"1_table",
+                    "title":"表1 激光光谱结果",
+                    "col_widths_mm":[14,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
+                    "row_widths_mm":[30,30],
+                    "keep_together":true
+                },
+                "[indent=42]λ[sub=ex]={{λex}}nm",
+                {
+                    "type":"grid_table",
+                    "field_key":"2_table",
+                    "title":"表2 发射光谱结果",
+                    "col_widths_mm":[14,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
+                    "row_widths_mm":[30,30],
+                    "keep_together":true
+                },
+                "[indent=42]λ[sub=em]={{λem}}nm",
+                "2.标准曲线的绘制及未知液的测定",
+                {
+                    "type":"grid_table",
+                    "field_key":"standard_curve",
+                    "title":"表3 标准系列及样品测定结果",
+                    "col_widths_mm":[28,15,15,15,15,15,15,15,15],
+                    "row_widths_mm":[30,30,30],
+                    "keep_together":true
+                },
+                "[indent=21]回归曲线方程：{{fac}}；相关系数{{para}}。",
+                "[indent=21]样品溶液DNA的浓度为{{C}}μg/mL。"
             ]
         },
         {

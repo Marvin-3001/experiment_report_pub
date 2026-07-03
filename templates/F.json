@@ -1,0 +1,158 @@
+{
+    "template_name":"离子选择性电极测定氟离子",
+    "title":"离子选择性电极测定氟离子",   
+
+    "basic_info_keys":[
+        "experiment_name",
+        "student_name",
+        "student_id",
+        "experiment_date",
+        "teacher_name"
+    ],
+
+    "fields":[
+        {
+            "key":"experiment_name",
+            "label":"实验名称",
+            "type":"line",
+            "required":true,
+            "default":"离子选择性电极测定氟离子"
+        },
+        {
+            "key":"student_name",
+            "label":"学生姓名",
+            "type":"line",
+            "required":true,
+            "default":""
+        },
+        {
+            "key":"student_id",
+            "label":"学号",
+            "type":"line",
+            "required":false,
+            "default":""
+        },
+        {
+            "key":"teacher_name",
+            "label":"指导教师",
+            "type":"line",
+            "required":false,
+            "default":""
+        },
+        {
+            "key":"experiment_date",
+            "label":"实验日期",
+            "type":"date",
+            "required":true,
+            "default":""
+        },
+        {
+            "key":"problem_analysis",
+            "label":"五、实验结果处理与分析",
+            "type":"text",
+            "required":true,
+            "default":""
+        },
+        {
+            "key":"fluoride_table",
+            "label":"氟离子测定数据表",
+            "type":"grid_table",
+            "required":false,
+            "rows":3,
+            "cols":9,
+            "col_widths_px": [60, 40, 40, 40, 40, 40, 40, 42, 42],
+            "row_heights_px": [58, 42, 58],
+            "cells":[
+                    {"row": 0, "col": 0, "text": "含量\nµg/50mL", "readonly": true},
+                    {"row": 0, "col": 1, "text": "0.0", "readonly": true},
+                    {"row": 0, "col": 2, "text": "1.0", "readonly": true},
+                    {"row": 0, "col": 3, "text": "2.0", "readonly": true},
+                    {"row": 0, "col": 4, "text": "6.0", "readonly": true},
+                    {"row": 0, "col": 5, "text": "10", "readonly": true},
+                    {"row": 0, "col": 6, "text": "14", "readonly": true},
+                    {"row": 0, "col": 7, "text": "样品 1", "readonly": true},
+                    {"row": 0, "col": 8, "text": "样品 2", "readonly": true},
+                    {"row": 1, "col": 0, "text": "lgCF-", "readonly": true},
+                    {"row": 2, "col": 0, "text": "电位mV", "readonly": true}
+            ]
+        },
+        {
+            "key":"question_1",
+            "label":"六、思考题1",
+            "type":"text",
+            "required":true,
+            "default":""
+        },
+        {
+            "key":"question_2",
+            "label":"六、思考题2",
+            "type":"text",
+            "required":true,
+            "default":""
+        }
+    ],
+
+    "sections":[
+        {
+            "heading":"一、实验目的",
+            "content":[
+                "[indent=21]1.了解国标法检测氟离子的方法和原理",
+                "[indent=21]2.掌握国标法测定氟的实验技术和数据处理方法"
+            ]
+        },
+        {
+            "heading":"二、实验原理",
+            "content":[
+                "[indent=21]将氟离子选择电极和外参电极（如甘汞电极）浸入欲测含氟溶液，构成原电池。该原电池的电动势与待测氟离子活度的对数呈线性关系，故通过测量电极与已知F[sup=-]浓度溶液组成的原电池电动势和电极与待测F[sup=-]浓度溶液组成原电池的电动势，即可计算出待测水样中F[sup=-]浓度。常用定量方法是标准曲线法和标准加入法。当氟电极与含氟的试液接触时，电池的电动势(E)随溶液中氟离子活度的变化而改变（遵守能斯特方程）。当溶液的总离子强度为定值且足够时，服从下述关系式：",
+                "[indent=168]E=E[sub=0]-2.303RT/F×lgC[sub=F-]",
+                "[indent=21]E与lgC[sub=F-]成直线关系，2.303RT/F该直线的斜率，亦为电极的斜率。",
+                "[indent=21]工作电池可表示如下：Ag/Cl,Cl[sup=-]（0.33 mol/L, F[sup=-](0.001mol/L)/LaF[sub=3]∥试液∥外参比电极（当碱性溶液中OH[sup=-]的浓度大于F[sup=-]的1/10时影响测定，其他一般常见的阴阳离子均不干扰测定，测定溶液的pH为5-6，对于污染严重的生活污水和工业废水，以及含氟硼酸盐的水样均要进行蒸馏。）"
+            ]
+        },
+        {
+            "heading":"三、实验仪器与试剂",
+            "content":[
+                "[indent=21]1.离子计（电位仪）；电磁搅拌器；氟离子选择性电极；饱和甘汞电极。",
+                "[indent=21]2.试剂",
+                "（1）总离子强度调节剂（TISAB，pH5.5-6）：称取分析纯柠檬酸6.0 g，柠檬酸三钠57 g，用蒸馏水配置至500 mL；",
+                "（2）氟标准溶液（1.0 mg/mL）：称取在120 oC烘干的氟化钠0.2210 g，溶于蒸馏水中，移入100 mL容量瓶中，稀释至刻度摇匀，转入塑料瓶中保存备用；",
+                "（3）氟标准溶液（10.0 μg/mL）： 称取上述1.0 mg/mL标准溶液5.0 mL，稀释至500 mL。 "
+            ]
+        },
+        {
+            "heading":"四、实验步骤",
+            "content":[
+                "[indent=21]1.仪器与电极准备：打开离子计电源，在短路开关接入状态下，调节仪器零点旋钮至数字显示为0；连接电极，分别按照标识插入氟离子选择电极及参比电极（饱和甘汞电极）。取蒸馏水一杯，放入磁力搅拌子，将电极插入液面，在电磁搅拌状态下，洗涤电极至电位值不变，记录下初始值。",
+                "[indent=21]2.标准曲线的绘制：配置含氟量分别为：0，1.0，2.0，6.0，10，14 μg的标准系列分别于50 mL的容量瓶中，加入总离子强度缓冲剂（TISAB）20 mL，加水至刻度，摇匀。分别倒入50 mL烧杯中，插入离子选择性电极和饱和甘汞电极进行测定，记录平衡时的电位。",
+                "[indent=21]3.以氟离子浓度的对数值为横坐标，相应的电位值为纵坐标，绘制工作曲线。",
+                "[indent=21]4.试样的测定：小心量取1 mL试样于50 mL容量瓶中，加入TISAB 20mL，稀释至刻度，摇匀，同步骤2操作。",
+                "[indent=21]5.数据处理：",
+                "[indent=21]将测试结果填入下表：",
+                {
+                    "type": "grid_table",
+                    "field_key": "fluoride_table",
+                    "title": "",
+                    "col_widths_mm": [23, 18, 18, 18, 18, 18, 18, 20, 20],
+                    "row_heights_mm": [18, 10, 18],
+                    "keep_together": true
+                },
+                "[indent=21]根据上述数据绘制标准曲线并查找样品的lgC[sub=F-]值。"
+            ]
+        },
+        {
+            "heading":"五、实验结果处理与分析",
+            "content":[
+                "[indent=21]{{problem_analysis}}"
+            ]
+        },
+        {
+            "heading":"六、问题讨论",
+            "content":[
+                "1.实验中加入总离子强度缓冲剂（TISAB）的作用是什么？",
+                "[indent=21]{{question_1}}",
+                "2.氟离子选择性电极应该怎样预处理和保存。",
+                "[indent=21]{{question_2}}"
+            ]
+        }
+    ]
+}
