@@ -1,0 +1,182 @@
+{
+    "template_name":"循环伏安法测电极反应参数",
+    "title":"循环伏安法测电极反应参数",
+
+    "basic_info_keys": [
+        "experiment_name",
+        "student_name",
+        "student_id",
+        "experiment_date",
+        "teacher_name"
+    ],
+
+    "fields": [
+        {
+            "key": "experiment_name",
+            "label": "实验名称",
+            "type": "line",
+            "required": true,
+            "default": "循环伏安法测电极反应参数"
+        },
+        {
+            "key": "student_name",
+            "label": "学生姓名",
+            "type": "line",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "student_id",
+            "label": "学号",
+            "type": "line",
+            "required": false,
+            "default": ""
+        },
+        {
+            "key": "teacher_name",
+            "label": "指导教师",
+            "type": "line",
+            "required": false,
+            "default": ""
+        },
+        {
+            "key": "experiment_date",
+            "label": "实验日期",
+            "type": "date",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key":"cv_table",
+            "label":"五、实验结果与处理",
+            "type":"grid_table",
+            "required":false,
+            "rows": 7,
+            "cols": 8,
+            "col_widths_px": [190, 100, 75, 75, 75, 75, 75, 85],
+            "row_heights_px": [60, 42, 42, 42, 42, 42, 42],
+            "cells": [
+                {"row": 0, "col": 0, "text": "体系", "readonly": true},
+                {"row": 0, "col": 1, "text": "Scan Rate(V/s)", "readonly": true},
+                {"row": 0, "col": 2, "text": "E[sub=pc](V)", "readonly": true},
+                {"row": 0, "col": 3, "text": "E[sub=pa](V)", "readonly": true},
+                {"row": 0, "col": 4, "text": "ΔE[sub=p](V)", "readonly": true},
+                {"row": 0, "col": 5, "text": "I[sub=pa](A)", "readonly": true},
+                {"row": 0, "col": 6, "text": "I[sub=pc](A)", "readonly": true},
+                {"row": 0, "col": 7, "text": "I[sub=pa]/I[sub=pc]", "readonly": true},
+                {"row": 1, "col": 0, "text": "5 mM K3[Fe(CN)6]\nin 0.1 M KCl", "readonly": true},
+                {"row": 1, "col": 1, "text": "0.02", "readonly": true},
+                {"row": 2, "col": 1, "text": "0.05", "readonly": true},
+                {"row": 3, "col": 1, "text": "0.1", "readonly": true},
+                {"row": 4, "col": 1, "text": "0.2", "readonly": true},
+                {"row": 5, "col": 1, "text": "0.5", "readonly": true},
+                {"row": 6, "col": 1, "text": "1", "readonly": true}
+            ],
+            "spans": [
+                {"row": 1, "col": 0, "rowspan": 6, "colspan": 1}
+                    ]
+        },
+        {
+            "key": "question_1",
+            "label": "六、思考题1",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "question_2",
+            "label": "六、思考题2",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+        {
+            "key": "question_3",
+            "label": "六、思考题3",
+            "type": "text",
+            "required": true,
+            "default": ""
+        },
+            {
+            "key": "question_4",
+            "label": "六、思考题4",
+            "type": "text",
+            "required": true,
+            "default": ""
+        }
+    ],
+
+    "sections":[
+        {
+            "heading":"一、实验目的",
+            "content":[
+                "[indent=21]1.了解循环伏安图的特性",
+                "[indent=21]2.学习和掌握循环伏安法的原理和实验技术。"
+            ]
+        },
+        {
+            "heading":"二、实验原理",
+            "content":[
+                "[indent=21]以等腰三角形的脉冲电压加在工作电极上，得到的电流电压曲线包括两个分支，如果前半部分电位向阴极方向扫描，电活性物质在电极上还原，产生还原波，那么后半部分电位向阳极方向扫描时，还原产物又会重新在电极上氧化，产生氧化波。因此一次三角波扫描，完成一个还原和氧化过程的循环，故该法称为循环伏安法，其电流—电压曲线称为循环伏安图。",
+                {
+                    "type":"preset_image",
+                    "file":"6-1.png",
+                    "title":"循环伏安法的典型激发信号",
+                    "max_width_mm": 160,
+                    "max_height_mm": 80,
+                    "keep_together": true
+                }
+            ]
+        },
+        {
+            "heading":"三、实验仪器与试剂",
+            "content":[
+                "[indent=21]1.瑞士万通电化学工作站或CHI660电化学系统；玻碳电极/铂电极/金电极为工作电极；甘汞电极或银/氯化银电极为参比电极；铂丝/铂片电极为辅助电极。",
+                "[indent=21]2.固体铁氰化钾、KCl溶液；高纯水。",
+                "[indent=21]3.50 ml 容量瓶、50 ml烧杯、10 ml比色管、玻棒。"
+            ]
+        },
+        {
+            "heading":"四、实验步骤",
+            "content":[
+                "[indent=21]1.溶液的配置",
+                "[indent=21]配置浓度为5 mM的铁氰化钾溶液（0.1 M KCl），适量溶液倒至电解池中。",
+                "[indent=21]2.电极的预处理",
+                "[indent=21]将工作电极在用抛光粉抛光，再用蒸馏水在超声中清洗。",
+                "[indent=21]3.电极的连接",
+                "[indent=21]依次接上工作电极、参比电极和辅助电极。",
+                "[indent=21]4.仪器操作",
+                "[indent=21]（1）开启电化学工作站及计算机电源开关，启动电化学应用程序，并进行仪器硬件检测;",
+                "[indent=21]（2）在菜单中依次选择Setup, Technique, CV, Parameter, 进行实验参数设定：Init E (0.7 V), High E (0.7 V), Low E (0 V), Scan rate (0.02V/s), Segment (2), Sample Interval (0.001 V), quiet time (2 s), Sensitivity (5e-5 A/v) ",
+                "[indent=21]（3）电极Run开始扫描，将实验图谱保存，记录氧化还原峰电位E[sub=pc]、E[sub=pa]及峰电流I[sub=pc]、I[sub=pa];",
+                "[indent=21]（4）改变扫描速度为0.02，0.05，0.1，0.2，0.5和1 V/s，分别作循环伏安图，分别记录每个扫描速度下的电化学参数。"
+            ]
+        },
+        {
+            "heading":"五、实验结果与处理",
+            "content":[
+            {
+            "type": "grid_table",
+            "field_key": "cv_table",
+            "title": "",
+            "col_widths_mm": [43, 24, 18, 18, 18, 18, 18, 20],
+            "row_heights_mm": [18, 12, 12, 12, 12, 12, 12],
+            "keep_together": true
+                }
+            ]
+        },
+        {
+            "heading":"六、思考题",
+            "content":[
+                "[indent=21]1.如何判断电极表面的处理程度？",
+                "[indent=21]{{question_1}}",
+                "[indent=21]2.从循环伏安图可以测定哪些电极反应的参数？",
+                "[indent=21]{{question_2}}",
+                "[indent=21]3.如何判断电极反应的可逆性？",
+                "[indent=21]{{question_3}}",
+                "[indent=21]4.电极表面粗糙度的计算？",
+                "[indent=21]{{question_4}}"
+            ]
+        }
+    ]
+}

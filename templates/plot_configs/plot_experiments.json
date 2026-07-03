@@ -1,0 +1,94 @@
+{
+  "styles": {
+    "blue": {
+      "gridline_color": "#CFCFCF",
+      "font_size_px": 13,
+      "alternate_background_color": "#F7F9FC",
+      "background": "white",
+      "item_color": "black",
+      "header_background_color": "#006CBF"
+    },
+    "green": {
+      "gridline_color": "#D0D0D0",
+      "font_size_px": 13,
+      "alternate_background_color": "#FFF8E8",
+      "background": "white",
+      "item_color": "black",
+      "header_background_color": "#127840"
+    },
+    "gray": {
+      "gridline_color": "#CFCFCF",
+      "font_size_px": 13,
+      "alternate_background_color": "#F4F4F4",
+      "background": "white",
+      "item_color": "black",
+      "header_background_color": "#595959"
+    }
+  },
+  "experiments": [
+    {
+      "name": "离子选择性电极测定氟离子",
+      "headers": ["lgC F-", "Voltage"],
+      "rows": 20,
+      "cols": 2,
+      "style": "blue",
+      "plot_type": "calibration1"
+    },
+    {
+      "name": "甲苯，萘的高效液相色谱分析",
+      "headers": ["Concentration", "Response"],
+      "rows": 20,
+      "cols": 2,
+      "style": "green",
+      "plot_type": "calibration2"
+    },
+    {
+      "name": "气相色谱流动相速度对柱效的影响",
+      "headers": ["u", "H"],
+      "rows": 20,
+      "cols": 2,
+      "style": "gray",
+      "plot_type": "point"
+    },
+    {
+      "name": "ICP-OES多元素的同时测定",
+      "headers": ["Concentration", "Signal"],
+      "rows": 20,
+      "cols": 2,
+      "style": "blue",
+      "plot_type": "calibration3"
+    },
+    {
+      "name": "火焰原子吸收测定水样中的钾",
+      "headers": ["Concentration", "Signal"],
+      "rows": 20,
+      "cols": 2,
+      "style": "green",
+      "plot_type": "calibration3"
+    },
+    {
+      "name": "原子荧光测定天然水中的砷和汞",
+      "headers": ["Concentration", "Signal"],
+      "rows": 20,
+      "cols": 2,
+      "style": "gray",
+      "plot_type": "calibration3"
+    },
+    {
+      "name": "吖啶橙荧光探针法测定DNA-标准曲线图",
+      "headers": ["Concentration", "Signal"],
+      "rows": 20,
+      "cols": 2,
+      "style": "blue",
+      "plot_type": "calibration3"
+    },
+    {
+      "name": "吖啶橙荧光探针法测定DNA-光谱图",
+      "headers": ["Wavelength", "Intensity"],
+      "rows": 20,
+      "cols": 2,
+      "style": "green",
+      "plot_type": "line"
+    }
+  ]
+}

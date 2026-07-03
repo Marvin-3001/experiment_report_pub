@@ -11,11 +11,12 @@ from reportlab.lib import colors
 from reportlab.lib.units import mm
 from xml.sax.saxutils import escape
 from scipy.optimize import curve_fit
+from matplotlib import font_manager
 from matplotlib.figure import Figure
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.pdfbase import pdfmetrics
-from PyQt6.QtGui import QShortcut, QKeySequence
+from PyQt6.QtGui import QShortcut, QKeySequence, QFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -37,7 +38,53 @@ APP_STATE = {
 
 CHINESE_FONT_NAME = "STSong-Light"
 WESTERN_FONT_NAME = "TimesNewRoman"
-TIMES_NEW_ROMAN_PATH = Path(r"C:\Windows\Fonts\times.ttf")
+
+def find_times_new_roman_path():
+    """
+    自动查找 Times New Roman 常规字体文件。
+    优先使用 Windows Fonts 文件夹；
+    如果找不到，再使用 matplotlib 的字体查找机制。
+    """
+
+    candidate_paths = [
+        Path(r"C:\Windows\Fonts\times.ttf"),
+        Path(r"C:\Windows\Fonts\Times.ttf"),
+        Path(r"C:\Windows\Fonts\TIMES.TTF"),
+    ]
+
+    windows_dir = Path(str(Path.home().anchor)) / "Windows" / "Fonts"
+
+    candidate_paths.extend([
+        windows_dir / "times.ttf",
+        windows_dir / "Times.ttf",
+        windows_dir / "TIMES.TTF",
+    ])
+
+    for font_path in candidate_paths:
+        if font_path.exists():
+            return font_path
+
+    try:
+        found_path = font_manager.findfont(
+            "Times New Roman",
+            fallback_to_default=False
+        )
+
+        found_path = Path(found_path)
+
+        if found_path.exists():
+            return found_path
+
+    except (ValueError, RuntimeError, OSError):
+        pass
+
+    raise FileNotFoundError(
+        "没有找到 Times New Roman 字体文件。"
+        "请确认系统已安装 Times New Roman，或手动指定 TIMES_NEW_ROMAN_PATH。"
+    )
+
+
+TIMES_NEW_ROMAN_PATH = find_times_new_roman_path()
 
 
 # =========================================================
@@ -353,19 +400,24 @@ def enable_excel_navigation(table):
         if row < 0:
             row = 0
 
-        # 如果超过最后一行，自动加 5 行
+        # 如果超过最后一行，根据表格属性决定是否自动加行
         if row >= table.rowCount():
-            old_row_count = table.rowCount()
-            previous_block_state = table.blockSignals(True)
-            try:
-                table.setRowCount(old_row_count + 5)
+            allow_expand_rows = getattr(table, "report_allow_expand_rows", True)
 
-                for r in range(old_row_count, old_row_count + 5):
-                    for c in range(table.columnCount()):
-                        if table.item(r, c) is None:
-                            table.setItem(r, c, QTableWidgetItem(""))
-            finally:
-                table.blockSignals(previous_block_state)
+            if allow_expand_rows:
+                old_row_count = table.rowCount()
+                previous_block_state = table.blockSignals(True)
+                try:
+                    table.setRowCount(old_row_count + 5)
+
+                    for r in range(old_row_count, old_row_count + 5):
+                        for c in range(table.columnCount()):
+                            if table.item(r, c) is None:
+                                table.setItem(r, c, QTableWidgetItem(""))
+                finally:
+                    table.blockSignals(previous_block_state)
+            else:
+                row = table.rowCount() - 1
 
         # 如果目标格子没有 item，就补一个空 item
         if table.item(row, col) is None:
@@ -524,7 +576,7 @@ def plot_point(state):
     if len(x) < 3:
         raise ValueError("数据点不足")
 
-    if np.any(x < 0):
+    if np.any(x <= 0):
         raise ValueError("流速 u 不能为 0 或负数")
 
     def model_func(u, A, B, C):
@@ -641,6 +693,132 @@ def plot_line(state):
     canvas.draw()
 
 
+PLOT_FUNCTIONS = {
+    "calibration1": plot_calibration1,
+    "calibration2": plot_calibration2,
+    "point": plot_point,
+    "calibration3": plot_calibration3,
+    "line": plot_line
+}
+
+
+def build_qtable_style(style_config):
+    """
+    根据 JSON 中的 style 配置生成 QTableWidget 样式。
+    """
+
+    gridline_color = style_config.get("gridline_color", "#CFCFCF")
+    font_size_px = int(style_config.get("font_size_px", 13))
+    alternate_background_color = style_config.get("alternate_background_color", "#F7F9FC")
+    background = style_config.get("background", "white")
+    item_color = style_config.get("item_color", "black")
+    header_background_color = style_config.get("header_background_color", "#006CBF")
+
+    return f"""
+        QTableWidget {{
+            gridline-color: {gridline_color};
+            font-size: {font_size_px}px;
+            alternate-background-color: {alternate_background_color};
+            background: {background};
+        }}
+        QTableWidget::item {{
+            color: {item_color};
+        }}
+        QHeaderView::section {{
+            background-color: {header_background_color};
+            padding: 4px;
+            border: 1px solid #D5DDE8;
+            font-weight: bold;
+        }}
+    """
+
+
+def load_single_plot_config(json_path):
+    """
+    读取单个绘图配置 JSON。
+    """
+
+    with open(json_path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def load_plot_experiment_configs(config_dir):
+    """
+    从 templates/plot_configs 文件夹读取绘图实验配置。
+    返回格式与原来的 experiments 字典一致。
+    """
+
+    config_dir = Path(config_dir)
+
+    if not config_dir.exists():
+        raise FileNotFoundError(f"绘图配置文件夹不存在：{config_dir}")
+
+    json_files = sorted(config_dir.glob("*.json"))
+
+    if not json_files:
+        raise FileNotFoundError(f"绘图配置文件夹中没有找到 JSON 文件：{config_dir}")
+
+    experiments = {}
+
+    for json_path in json_files:
+        config_data = load_single_plot_config(json_path)
+        styles = config_data.get("styles", {})
+
+        for experiment_config in config_data.get("experiments", []):
+            name = str(experiment_config.get("name", "")).strip()
+
+            if not name:
+                raise ValueError(f"{json_path} 中存在没有 name 的实验配置。")
+
+            if name in experiments:
+                raise ValueError(f"绘图实验名称重复：{name}")
+
+            plot_type = str(experiment_config.get("plot_type", "")).strip()
+
+            if plot_type not in PLOT_FUNCTIONS:
+                raise ValueError(
+                    f"未知 plot_type：{plot_type}。"
+                    f"可用类型：{', '.join(PLOT_FUNCTIONS.keys())}"
+                )
+
+            headers = experiment_config.get("headers", [])
+            rows = int(experiment_config.get("rows", 20))
+            cols = int(experiment_config.get("cols", len(headers)))
+
+            if not headers:
+                raise ValueError(f"{name} 缺少 headers。")
+
+            if len(headers) != cols:
+                raise ValueError(
+                    f"{name} 的 headers 数量与 cols 不一致："
+                    f"headers={len(headers)}, cols={cols}"
+                )
+
+            style_ref = experiment_config.get("style", {})
+
+            if isinstance(style_ref, str):
+                style_config = styles.get(style_ref)
+
+                if style_config is None:
+                    raise ValueError(f"{name} 引用了不存在的 style：{style_ref}")
+
+            elif isinstance(style_ref, dict):
+                style_config = style_ref
+
+            else:
+                style_config = {}
+
+            experiments[name] = {
+                "headers": headers,
+                "rows": rows,
+                "cols": cols,
+                "style": build_qtable_style(style_config),
+                "plot_func": PLOT_FUNCTIONS[plot_type]
+            }
+
+    return experiments
+
+
 # =========================================================
 # 主函数：创建整个界面
 # =========================================================
@@ -745,199 +923,7 @@ def build_plot_window():
     figure.add_subplot(111)
 
     # 实验的配置
-    experiments = {
-        "离子选择性电极测定氟离子": {
-            "headers": ["lgC F-", "Voltage"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F7F9FC;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #006CBF;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-            """,
-            "plot_func": plot_calibration1
-        },
-
-        "甲苯，萘的高效液相色谱分析": {
-            "headers": ["Concentration", "Response"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #D0D0D0;
-                    font-size: 13px;
-                    alternate-background-color: #FFF8E8;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #127840;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-            """,
-            "plot_func": plot_calibration2
-        },
-
-        "气相色谱流动相速度对柱效的影响": {
-            "headers": ["u", "H"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F4F4F4;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #595959;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-            """,
-            "plot_func": plot_point
-        },
-
-        "ICP-OES多元素的同时测定": {
-            "headers": ["Concentration", "Signal"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F7F9FC;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #006CBF;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-            """,
-            "plot_func": plot_calibration3
-        },
-
-        "火焰原子吸收测定水样中的钾": {
-            "headers": ["Concentration", "Signal"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-            QTableWidget {
-                gridline-color: #D0D0D0;
-                font-size: 13px;
-                alternate-background-color: #FFF8E8;
-                background: white;
-            }
-            QTableWidget::item {
-                color: black;
-            }
-            QHeaderView::section {
-                background-color: #127840;
-                padding: 4px;
-                border: 1px solid #D5DDE8;
-                font-weight: bold;
-            }
-        """,
-            "plot_func": plot_calibration3
-        },
-
-        "原子荧光测定天然水中的砷和汞": {
-            "headers": ["Concentration", "Signal"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F4F4F4;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #595959;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-                """,
-            "plot_func": plot_calibration3
-        },
-
-        "吖啶橙荧光探针法测定DNA-标准曲线图": {
-            "headers": ["Concentration", "Signal"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F7F9FC;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #006CBF;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                    }
-                    """,
-            "plot_func": plot_calibration3
-        },
-
-        "吖啶橙荧光探针法测定DNA-光谱图": {
-            "headers": ["Wavelength", "Intensity"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #D0D0D0;
-                    font-size: 13px;
-                    alternate-background-color: #FFF8E8;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #127840;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                        }
-                        """,
-            "plot_func": plot_line
-        },
-    }
+    experiments = load_plot_experiment_configs(PLOT_CONFIG_DIR)
 
     # 状态字典
     state = {
@@ -1031,26 +1017,6 @@ def load_report_templates(template_dir: str | Path = "templates") -> dict:
     return templates
 
 
-def normalize_content(content):
-    """
-    统一处理章节正文。
-
-    支持两种写法：
-    1. content 是字符串
-    2. content 是列表，每个元素是一段文字
-
-    最终统一返回字符串。
-    """
-
-    if content is None:
-        return ""
-
-    if isinstance(content, list):
-        return "\n".join(str(paragraph) for paragraph in content)
-
-    return str(content)
-
-
 def ensure_result_image_field(template):
     """
     给报告模板补充一个结果图片字段。
@@ -1084,6 +1050,7 @@ def is_result_section_heading(heading):
 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 PRESET_IMAGE_DIR = TEMPLATE_DIR / "image"
+PLOT_CONFIG_DIR = TEMPLATE_DIR / "plot_configs"
 
 REPORT_TEMPLATES = load_report_templates(TEMPLATE_DIR)
 
@@ -1126,7 +1093,7 @@ def is_western_text_char(char):
     5. 常见单位/数学符号。
     """
 
-    if char in "µμ×°℃℉±−‰":
+    if char in "µμ×°℃℉±−‰λΛΔαβγδθπσΩω":
         return True
 
     code_point = ord(char)
@@ -1174,12 +1141,12 @@ def escape_text_with_mixed_fonts(text):
 def safe_paragraph_text(text):
     """
     将普通文本转换为 ReportLab Paragraph 可识别的安全文本。
-
-    额外支持：
+    支持：
     1. 中文默认使用 STSong-Light；
-    2. 西文、数字、µ 等自动切换为 Times New Roman；
-    3. 科学计数法写法：[sci=-3]；
-    4. 换行符转换为 <br/>。
+    2. 西文、数字、µ、λ、Δ 等自动切换为 Times New Roman；
+    3. 上标：[sup=-3]；
+    4. 下标：[sub=pc]；
+    5. 换行符转换为 <br/>。
     """
 
     if text is None:
@@ -1187,19 +1154,27 @@ def safe_paragraph_text(text):
 
     text = str(text)
 
-    pattern = r"\[sci=([+-]?\d+)]"
+    inline_pattern = r"\[(sup|sub)=([^\]]+)]"
 
     parts = []
     last_index = 0
 
-    for match in re.finditer(pattern, text):
+    for match in re.finditer(inline_pattern, text):
         before_text = text[last_index:match.start()]
-        exponent = match.group(1)
+        marker_type = match.group(1)
+        marker_text = match.group(2)
 
         parts.append(escape_text_with_mixed_fonts(before_text))
-        parts.append(
-            f'<super><font name="{WESTERN_FONT_NAME}">{escape(exponent)}</font></super>'
-        )
+
+        if marker_type == "sup":
+            parts.append(
+                f"<super>{escape_text_with_mixed_fonts(marker_text)}</super>"
+            )
+
+        elif marker_type == "sub":
+            parts.append(
+                f"<sub>{escape_text_with_mixed_fonts(marker_text)}</sub>"
+            )
 
         last_index = match.end()
 
@@ -1209,10 +1184,6 @@ def safe_paragraph_text(text):
     rendered_text = rendered_text.replace("\n", "<br/>")
 
     return rendered_text
-
-
-def safe_paragraph_text_with_scientific_notation(text):
-    return safe_paragraph_text(text)
 
 
 def remove_extra_blank_lines(text):
@@ -1572,7 +1543,7 @@ def add_text_with_manual_indent_to_story(story, text, body_style):
             paragraph_text = paragraph
             paragraph_style = body_style
 
-        story.append(Paragraph(safe_paragraph_text_with_scientific_notation(paragraph_text), paragraph_style))
+        story.append(Paragraph(safe_paragraph_text(paragraph_text), paragraph_style))
 
 
 def build_three_line_table(table_config, data, normal_style, font_name):
@@ -1605,7 +1576,7 @@ def build_three_line_table(table_config, data, normal_style, font_name):
             cell_text = render_template_text(str(cell), data)
             rendered_row.append(
                 Paragraph(
-                    safe_paragraph_text_with_scientific_notation(cell_text),
+                    safe_paragraph_text(cell_text),
                     normal_style
                 )
             )
@@ -2052,6 +2023,54 @@ def expand_dimension_values(raw_values, expected_count, default_value):
     return result
 
 
+def plain_inline_markup_for_gui(text):
+    """
+    仅用于 GUI 显示：
+    将 [sub=...] / [sup=...] 去掉格式标记，显示为普通文本。
+    例如：
+    E[sub=pc]       -> Epc
+    I[sub=pa]       -> Ipa
+    10[sup=-3]      -> 10⁻³
+    """
+
+    if text is None:
+        return ""
+
+    text = str(text)
+
+    superscript_map = str.maketrans({
+        "0": "⁰",
+        "1": "¹",
+        "2": "²",
+        "3": "³",
+        "4": "⁴",
+        "5": "⁵",
+        "6": "⁶",
+        "7": "⁷",
+        "8": "⁸",
+        "9": "⁹",
+        "+": "⁺",
+        "-": "⁻",
+        "=": "⁼",
+        "(": "⁽",
+        ")": "⁾"
+    })
+
+    def replace_match(match):
+        marker_type = match.group(1)
+        marker_text = match.group(2)
+
+        if marker_type == "sup":
+            return marker_text.translate(superscript_map)
+
+        if marker_type == "sub":
+            return marker_text
+
+        return marker_text
+
+    return re.sub(r"\[(sup|sub)=([^]]+)]", replace_match, text)
+
+
 def create_grid_table_input_widget(field):
     """
     创建可编辑网格表格输入控件。
@@ -2094,10 +2113,12 @@ def create_grid_table_input_widget(field):
         if row < 0 or row >= rows or col < 0 or col >= cols:
             raise ValueError(f"grid_table 默认单元格超出范围：row={row}, col={col}")
 
-        item = QTableWidgetItem(text)
+        display_text = plain_inline_markup_for_gui(text)
+        item = QTableWidgetItem(display_text)
 
         if bool(cell.get("readonly", False)):
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            item.setData(Qt.ItemDataRole.UserRole, text)
             readonly_cells.add((row, col))
 
         table.setItem(row, col, item)
@@ -2110,6 +2131,21 @@ def create_grid_table_input_widget(field):
         colspan = int(span.get("colspan", 1))
 
         table.setSpan(row, col, rowspan, colspan)
+
+        # 合并区域内，除左上角外，其余隐藏单元格都禁止编辑和粘贴
+        for rr in range(row, row + rowspan):
+            for cc in range(col, col + colspan):
+                if (rr, cc) == (row, col):
+                    continue
+
+                readonly_cells.add((rr, cc))
+
+                item = table.item(rr, cc)
+                if item is None:
+                    item = QTableWidgetItem("")
+                    table.setItem(rr, cc, item)
+
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
     # 设置填写区列宽
     col_widths_px = expand_dimension_values(
@@ -2172,9 +2208,6 @@ def create_grid_table_input_widget(field):
 
     shortcut_paste.activated.connect(lambda: paste_from_clipboard(table))
     shortcut_delete.activated.connect(lambda: clear_selected_cells(table))
-
-    table.report_readonly_cells = readonly_cells
-    table.report_allow_expand = False
 
     table.report_readonly_cells = readonly_cells
     table.report_allow_expand_rows = False
@@ -2261,7 +2294,8 @@ def create_input_widget(field):
 def get_grid_table_widget_data(table):
     """
     读取 QTableWidget 的所有单元格内容。
-    返回二维列表。
+    如果单元格有 UserRole 原始文本，则优先使用原始文本；
+    否则使用 GUI 中显示的文本。
     """
 
     data = []
@@ -2275,7 +2309,12 @@ def get_grid_table_widget_data(table):
             if item is None:
                 row_data.append("")
             else:
-                row_data.append(item.text().strip())
+                raw_text = item.data(Qt.ItemDataRole.UserRole)
+
+                if raw_text is not None:
+                    row_data.append(str(raw_text).strip())
+                else:
+                    row_data.append(item.text().strip())
 
         data.append(row_data)
 
@@ -2344,10 +2383,12 @@ def rebuild_form(form_layout, input_widgets, template):
         widget = create_input_widget(field)
         input_widgets[key] = widget
 
+        display_label = plain_inline_markup_for_gui(label)
+
         if required:
-            label_text = f"{label} *"
+            label_text = f"{display_label} *"
         else:
-            label_text = label
+            label_text = display_label
 
         form_layout.addRow(QLabel(label_text), widget)
 
@@ -2444,10 +2485,10 @@ def build_three_line_table_preview(table_config, data):
     rows = table_config.get("rows", [])
 
     if table_title:
-        lines.append(f"[三线表] {table_title}")
+        lines.append(f"[三线表] {plain_inline_markup_for_gui(table_title)}")
 
     if headers:
-        lines.append(" | ".join(str(header) for header in headers))
+        lines.append(" | ".join(plain_inline_markup_for_gui(str(header)) for header in headers))
         lines.append(" | ".join("---" for _ in headers))
 
     for row in rows:
@@ -2456,7 +2497,7 @@ def build_three_line_table_preview(table_config, data):
         for cell in row:
             rendered_cell = render_template_text(str(cell), data)
             rendered_cell = strip_manual_indent_markers(rendered_cell)
-            rendered_cells.append(rendered_cell)
+            rendered_cells.append(plain_inline_markup_for_gui(rendered_cell))
 
         lines.append(" | ".join(rendered_cells))
 
@@ -2473,13 +2514,13 @@ def build_preview_text(template, data):
     4. three_line_table 三线表对象预览。
     """
 
-    lines = []
+    lines = [
+        template.get("title", "实验报告"),
+        "=" * 30,
+        "",
+        "【基本信息】"
+    ]
 
-    lines.append(template.get("title", "实验报告"))
-    lines.append("=" * 30)
-    lines.append("")
-
-    lines.append("【基本信息】")
     for key in template.get("basic_info_keys", []):
         label = get_field_label_by_key(template, key)
         value = data.get(key, "").strip()
@@ -2535,6 +2576,7 @@ def build_preview_text(template, data):
                         has_result_image_placeholder = True
 
                     preview_content = strip_manual_indent_markers(rendered_content)
+                    preview_content = plain_inline_markup_for_gui(preview_content)
                     lines.append(preview_content)
 
         else:
@@ -2544,6 +2586,7 @@ def build_preview_text(template, data):
                 has_result_image_placeholder = True
 
             preview_content = strip_manual_indent_markers(rendered_content)
+            preview_content = plain_inline_markup_for_gui(preview_content)
             lines.append(preview_content)
 
         if is_result_section_heading(heading):
