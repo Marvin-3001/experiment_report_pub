@@ -11,11 +11,12 @@ from reportlab.lib import colors
 from reportlab.lib.units import mm
 from xml.sax.saxutils import escape
 from scipy.optimize import curve_fit
+from matplotlib import font_manager
 from matplotlib.figure import Figure
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.pdfbase import pdfmetrics
-from PyQt6.QtGui import QShortcut, QKeySequence
+from PyQt6.QtGui import QShortcut, QKeySequence, QFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -37,7 +38,53 @@ APP_STATE = {
 
 CHINESE_FONT_NAME = "STSong-Light"
 WESTERN_FONT_NAME = "TimesNewRoman"
-TIMES_NEW_ROMAN_PATH = Path(r"C:\Windows\Fonts\times.ttf")
+
+def find_times_new_roman_path():
+    """
+    自动查找 Times New Roman 常规字体文件。
+    优先使用 Windows Fonts 文件夹；
+    如果找不到，再使用 matplotlib 的字体查找机制。
+    """
+
+    candidate_paths = [
+        Path(r"C:\Windows\Fonts\times.ttf"),
+        Path(r"C:\Windows\Fonts\Times.ttf"),
+        Path(r"C:\Windows\Fonts\TIMES.TTF"),
+    ]
+
+    windows_dir = Path(str(Path.home().anchor)) / "Windows" / "Fonts"
+
+    candidate_paths.extend([
+        windows_dir / "times.ttf",
+        windows_dir / "Times.ttf",
+        windows_dir / "TIMES.TTF",
+    ])
+
+    for font_path in candidate_paths:
+        if font_path.exists():
+            return font_path
+
+    try:
+        found_path = font_manager.findfont(
+            "Times New Roman",
+            fallback_to_default=False
+        )
+
+        found_path = Path(found_path)
+
+        if found_path.exists():
+            return found_path
+
+    except (ValueError, RuntimeError, OSError):
+        pass
+
+    raise FileNotFoundError(
+        "没有找到 Times New Roman 字体文件。"
+        "请确认系统已安装 Times New Roman，或手动指定 TIMES_NEW_ROMAN_PATH。"
+    )
+
+
+TIMES_NEW_ROMAN_PATH = find_times_new_roman_path()
 
 
 # =========================================================
@@ -646,6 +693,132 @@ def plot_line(state):
     canvas.draw()
 
 
+PLOT_FUNCTIONS = {
+    "calibration1": plot_calibration1,
+    "calibration2": plot_calibration2,
+    "point": plot_point,
+    "calibration3": plot_calibration3,
+    "line": plot_line
+}
+
+
+def build_qtable_style(style_config):
+    """
+    根据 JSON 中的 style 配置生成 QTableWidget 样式。
+    """
+
+    gridline_color = style_config.get("gridline_color", "#CFCFCF")
+    font_size_px = int(style_config.get("font_size_px", 13))
+    alternate_background_color = style_config.get("alternate_background_color", "#F7F9FC")
+    background = style_config.get("background", "white")
+    item_color = style_config.get("item_color", "black")
+    header_background_color = style_config.get("header_background_color", "#006CBF")
+
+    return f"""
+        QTableWidget {{
+            gridline-color: {gridline_color};
+            font-size: {font_size_px}px;
+            alternate-background-color: {alternate_background_color};
+            background: {background};
+        }}
+        QTableWidget::item {{
+            color: {item_color};
+        }}
+        QHeaderView::section {{
+            background-color: {header_background_color};
+            padding: 4px;
+            border: 1px solid #D5DDE8;
+            font-weight: bold;
+        }}
+    """
+
+
+def load_single_plot_config(json_path):
+    """
+    读取单个绘图配置 JSON。
+    """
+
+    with open(json_path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def load_plot_experiment_configs(config_dir):
+    """
+    从 templates/plot_configs 文件夹读取绘图实验配置。
+    返回格式与原来的 experiments 字典一致。
+    """
+
+    config_dir = Path(config_dir)
+
+    if not config_dir.exists():
+        raise FileNotFoundError(f"绘图配置文件夹不存在：{config_dir}")
+
+    json_files = sorted(config_dir.glob("*.json"))
+
+    if not json_files:
+        raise FileNotFoundError(f"绘图配置文件夹中没有找到 JSON 文件：{config_dir}")
+
+    experiments = {}
+
+    for json_path in json_files:
+        config_data = load_single_plot_config(json_path)
+        styles = config_data.get("styles", {})
+
+        for experiment_config in config_data.get("experiments", []):
+            name = str(experiment_config.get("name", "")).strip()
+
+            if not name:
+                raise ValueError(f"{json_path} 中存在没有 name 的实验配置。")
+
+            if name in experiments:
+                raise ValueError(f"绘图实验名称重复：{name}")
+
+            plot_type = str(experiment_config.get("plot_type", "")).strip()
+
+            if plot_type not in PLOT_FUNCTIONS:
+                raise ValueError(
+                    f"未知 plot_type：{plot_type}。"
+                    f"可用类型：{', '.join(PLOT_FUNCTIONS.keys())}"
+                )
+
+            headers = experiment_config.get("headers", [])
+            rows = int(experiment_config.get("rows", 20))
+            cols = int(experiment_config.get("cols", len(headers)))
+
+            if not headers:
+                raise ValueError(f"{name} 缺少 headers。")
+
+            if len(headers) != cols:
+                raise ValueError(
+                    f"{name} 的 headers 数量与 cols 不一致："
+                    f"headers={len(headers)}, cols={cols}"
+                )
+
+            style_ref = experiment_config.get("style", {})
+
+            if isinstance(style_ref, str):
+                style_config = styles.get(style_ref)
+
+                if style_config is None:
+                    raise ValueError(f"{name} 引用了不存在的 style：{style_ref}")
+
+            elif isinstance(style_ref, dict):
+                style_config = style_ref
+
+            else:
+                style_config = {}
+
+            experiments[name] = {
+                "headers": headers,
+                "rows": rows,
+                "cols": cols,
+                "style": build_qtable_style(style_config),
+                "plot_func": PLOT_FUNCTIONS[plot_type]
+            }
+
+    return experiments
+
+
 # =========================================================
 # 主函数：创建整个界面
 # =========================================================
@@ -750,199 +923,7 @@ def build_plot_window():
     figure.add_subplot(111)
 
     # 实验的配置
-    experiments = {
-        "离子选择性电极测定氟离子": {
-            "headers": ["lgC F-", "Voltage"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F7F9FC;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #006CBF;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-            """,
-            "plot_func": plot_calibration1
-        },
-
-        "甲苯，萘的高效液相色谱分析": {
-            "headers": ["Concentration", "Response"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #D0D0D0;
-                    font-size: 13px;
-                    alternate-background-color: #FFF8E8;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #127840;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-            """,
-            "plot_func": plot_calibration2
-        },
-
-        "气相色谱流动相速度对柱效的影响": {
-            "headers": ["u", "H"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F4F4F4;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #595959;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-            """,
-            "plot_func": plot_point
-        },
-
-        "ICP-OES多元素的同时测定": {
-            "headers": ["Concentration", "Signal"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F7F9FC;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #006CBF;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-            """,
-            "plot_func": plot_calibration3
-        },
-
-        "火焰原子吸收测定水样中的钾": {
-            "headers": ["Concentration", "Signal"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-            QTableWidget {
-                gridline-color: #D0D0D0;
-                font-size: 13px;
-                alternate-background-color: #FFF8E8;
-                background: white;
-            }
-            QTableWidget::item {
-                color: black;
-            }
-            QHeaderView::section {
-                background-color: #127840;
-                padding: 4px;
-                border: 1px solid #D5DDE8;
-                font-weight: bold;
-            }
-        """,
-            "plot_func": plot_calibration3
-        },
-
-        "原子荧光测定天然水中的砷和汞": {
-            "headers": ["Concentration", "Signal"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F4F4F4;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #595959;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                }
-                """,
-            "plot_func": plot_calibration3
-        },
-
-        "吖啶橙荧光探针法测定DNA-标准曲线图": {
-            "headers": ["Concentration", "Signal"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #CFCFCF;
-                    font-size: 13px;
-                    alternate-background-color: #F7F9FC;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #006CBF;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                    }
-                    """,
-            "plot_func": plot_calibration3
-        },
-
-        "吖啶橙荧光探针法测定DNA-光谱图": {
-            "headers": ["Wavelength", "Intensity"],
-            "rows": 20,
-            "cols": 2,
-            "style": """
-                QTableWidget {
-                    gridline-color: #D0D0D0;
-                    font-size: 13px;
-                    alternate-background-color: #FFF8E8;
-                    background: white;
-                }
-                QTableWidget::item {
-                    color: black;
-                }
-                QHeaderView::section {
-                    background-color: #127840;
-                    padding: 4px;
-                    border: 1px solid #D5DDE8;
-                    font-weight: bold;
-                        }
-                        """,
-            "plot_func": plot_line
-        },
-    }
+    experiments = load_plot_experiment_configs(PLOT_CONFIG_DIR)
 
     # 状态字典
     state = {
@@ -1036,26 +1017,6 @@ def load_report_templates(template_dir: str | Path = "templates") -> dict:
     return templates
 
 
-def normalize_content(content):
-    """
-    统一处理章节正文。
-
-    支持两种写法：
-    1. content 是字符串
-    2. content 是列表，每个元素是一段文字
-
-    最终统一返回字符串。
-    """
-
-    if content is None:
-        return ""
-
-    if isinstance(content, list):
-        return "\n".join(str(paragraph) for paragraph in content)
-
-    return str(content)
-
-
 def ensure_result_image_field(template):
     """
     给报告模板补充一个结果图片字段。
@@ -1089,6 +1050,7 @@ def is_result_section_heading(heading):
 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 PRESET_IMAGE_DIR = TEMPLATE_DIR / "image"
+PLOT_CONFIG_DIR = TEMPLATE_DIR / "plot_configs"
 
 REPORT_TEMPLATES = load_report_templates(TEMPLATE_DIR)
 
@@ -2523,10 +2485,10 @@ def build_three_line_table_preview(table_config, data):
     rows = table_config.get("rows", [])
 
     if table_title:
-        lines.append(f"[三线表] {table_title}")
+        lines.append(f"[三线表] {plain_inline_markup_for_gui(table_title)}")
 
     if headers:
-        lines.append(" | ".join(str(header) for header in headers))
+        lines.append(" | ".join(plain_inline_markup_for_gui(str(header)) for header in headers))
         lines.append(" | ".join("---" for _ in headers))
 
     for row in rows:
@@ -2535,7 +2497,7 @@ def build_three_line_table_preview(table_config, data):
         for cell in row:
             rendered_cell = render_template_text(str(cell), data)
             rendered_cell = strip_manual_indent_markers(rendered_cell)
-            rendered_cells.append(rendered_cell)
+            rendered_cells.append(plain_inline_markup_for_gui(rendered_cell))
 
         lines.append(" | ".join(rendered_cells))
 
@@ -2552,13 +2514,13 @@ def build_preview_text(template, data):
     4. three_line_table 三线表对象预览。
     """
 
-    lines = []
+    lines = [
+        template.get("title", "实验报告"),
+        "=" * 30,
+        "",
+        "【基本信息】"
+    ]
 
-    lines.append(template.get("title", "实验报告"))
-    lines.append("=" * 30)
-    lines.append("")
-
-    lines.append("【基本信息】")
     for key in template.get("basic_info_keys", []):
         label = get_field_label_by_key(template, key)
         value = data.get(key, "").strip()
