@@ -132,9 +132,6 @@
             ]
         },
         {
-
-        },
-        {
             "heading":"五、实验结果处理与分析",
             "content":[
                 "[indent=21]{{problem_analysis}}"

@@ -1,6 +1,7 @@
 import re
 import sys
 import json
+import shutil
 import tempfile
 import numpy as np
 from pathlib import Path
@@ -31,9 +32,16 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
 
 
 
+IMPORT_PICTURE_PREFIX = "import_picture"
+
 APP_STATE = {
     "picture_counter": 0,
-    "generated_pictures": {}
+    "generated_pictures": {},
+    "picture_sources": {},
+
+    "import_picture_counter": 0,
+    "import_pictures": {},
+    "import_picture_sources": {}
 }
 
 CHINESE_FONT_NAME = "STSong-Light"
@@ -293,7 +301,6 @@ def save_generated_plot_to_picture_store(state):
     每次绘图后，将当前 Matplotlib 图保存为一个可在报告正文中调用的图片变量。
     规则：
     1. {picture1}、{picture2}、{picture3} ... 分别对应每次点击“绘图”后保存的图片；
-    2. {picture} 永远指向最近一次点击“绘图”后保存的图片。
     """
 
     APP_STATE["picture_counter"] += 1
@@ -306,13 +313,59 @@ def save_generated_plot_to_picture_store(state):
     state["figure"].savefig(str(picture_path), dpi=300, bbox_inches="tight")
 
     APP_STATE["generated_pictures"][picture_key] = str(picture_path)
-    APP_STATE["generated_pictures"]["picture"] = str(picture_path)
+    APP_STATE["picture_sources"][picture_key] = str(
+        state.get("current_experiment", "")
+    ).strip()
 
-    picture_label = state.get("picture_label")
-    if picture_label is not None:
-        picture_label.setText(
-            f"当前图片变量：{{{picture_key}}}；最新图片也可用 {{picture}}"
-        )
+
+def is_import_picture_placeholder_key(key):
+    """
+    判断 key 是否是手动导入图片变量。
+    支持：
+    import_picture1、import_picture2、import_picture3 ...
+    """
+
+    key = str(key).strip()
+    pattern = rf"{re.escape(IMPORT_PICTURE_PREFIX)}[0-9]+"
+
+    return re.fullmatch(pattern, key) is not None
+
+
+def save_import_picture_to_picture_store(image_path):
+    """
+    将手动导入的单张图片复制到临时目录，并生成图片变量。
+    每导入一张图片，生成一个新变量：
+    {import_picture1}、{import_picture2}、{import_picture3} ...
+    """
+
+    image_path = str(image_path).strip()
+
+    if not image_path:
+        raise ValueError("导入图片路径为空。")
+
+    image_file = Path(image_path)
+
+    if not image_file.exists():
+        raise FileNotFoundError(f"导入图片不存在：{image_file}")
+
+    image_suffix = image_file.suffix.lower()
+
+    if image_suffix not in [".png", ".jpg", ".jpeg", ".bmp"]:
+        raise ValueError(f"不支持的图片格式：{image_suffix}")
+
+    APP_STATE["import_picture_counter"] += 1
+    image_key = f"{IMPORT_PICTURE_PREFIX}{APP_STATE['import_picture_counter']}"
+
+    picture_dir = Path(tempfile.gettempdir()) / "combined_experiment_tool_import_pictures"
+    picture_dir.mkdir(parents=True, exist_ok=True)
+
+    target_path = picture_dir / f"{image_key}{image_suffix}"
+    shutil.copy2(str(image_file), str(target_path))
+
+    APP_STATE["import_pictures"][image_key] = str(target_path)
+    APP_STATE["import_picture_sources"][image_key] = image_file.name
+
+    return image_key
 
 
 def plot_current_experiment(state):
@@ -857,9 +910,6 @@ def build_plot_window():
     btn_save = QPushButton("导出图片")
     control_layout.addWidget(btn_save)
 
-    picture_label = QLabel("当前图片变量：无")
-    control_layout.addWidget(picture_label)
-
     control_layout.addStretch()
 
     # 下方表格区和图片区
@@ -934,7 +984,6 @@ def build_plot_window():
         "canvas": canvas,
         "experiments": experiments,
         "current_experiment": None,
-        "picture_label": picture_label
     }
 
     # 下拉框加入实验名称
@@ -1015,28 +1064,6 @@ def load_report_templates(template_dir: str | Path = "templates") -> dict:
         templates[template_name] = template_data
 
     return templates
-
-
-def ensure_result_image_field(template):
-    """
-    给报告模板补充一个结果图片字段。
-    该字段不写入基本信息表，只用于在 PDF 的实验结果章节中插入图片。
-    如果模板里已经存在相同 key，则不重复添加。
-    """
-
-    fields = template.setdefault("fields", [])
-
-    for field in fields:
-        if field.get("key") == "result_image":
-            return
-
-    fields.append({
-        "key": "result_image",
-        "label": "实验结果图片",
-        "type": "image",
-        "required": False,
-        "default": ""
-    })
 
 
 def is_result_section_heading(heading):
@@ -1369,21 +1396,28 @@ def is_picture_placeholder_key(key):
     """
 
     key = str(key).strip()
-    return key == "picture" or key == "result_image" or re.fullmatch(r"picture[0-9]+", key) is not None
+
+    if re.fullmatch(r"picture[0-9]+", key) is not None:
+        return True
+
+    if is_import_picture_placeholder_key(key):
+        return True
+
+    return False
 
 
-def get_image_path_by_placeholder_key(key, data):
+def get_image_path_by_placeholder_key(key):
     """
     根据图片占位符 key 获取图片路径。
     """
 
     key = str(key).strip()
 
-    if key == "result_image":
-        return str(data.get("result_image", "")).strip()
-
     if key in APP_STATE["generated_pictures"]:
         return APP_STATE["generated_pictures"][key]
+
+    if key in APP_STATE["import_pictures"]:
+        return APP_STATE["import_pictures"][key]
 
     return ""
 
@@ -1498,20 +1532,6 @@ def append_preset_image_to_story(story, image_config, normal_style):
         story.append(KeepTogether(image_elements))
     else:
         story.extend(image_elements)
-
-
-def add_result_image_to_story(story, data):
-    """
-    兼容旧逻辑：如果用户选择了实验结果图片，但正文中没有手动放置图片占位符，
-    仍可将 result_image 插入实验结果章节。
-    """
-
-    image_path = data.get("result_image", "")
-
-    if not str(image_path).strip():
-        return
-
-    append_image_to_story(story, image_path, "{result_image}")
 
 
 def add_text_with_manual_indent_to_story(story, text, body_style):
@@ -1804,17 +1824,20 @@ def append_grid_table_to_story(story, table_config, template, data, normal_style
         story.extend(elements)
 
 
-def add_content_with_picture_placeholders_to_story(story, content, data, body_style):
+def add_content_with_picture_placeholders_to_story(story, content, body_style):
     """
     按正文中的图片占位符顺序加入文字和图片。
     支持：
-    1. {picture}：最近一次绘图；
-    2. {picture1}、{picture2} ...：第 1、2 ... 次绘图；
-    3. {result_image}：手动选择的实验结果图片；
-    4. {{ picture }}、{{ picture1 }}、{{ result_image }}：双大括号兼容写法。
+    1. {picture1}、{picture2} ...：绘图页生成的图片；
+    2. {import_picture1}、{import_picture2} ...：报告页导入的图片；
+    3. {{ picture1 }}、{{ import_picture1 }}：双大括号兼容写法。
     """
 
-    placeholder_pattern = r"\{\{\s*(picture[0-9]*|result_image)\s*\}\}|\{\s*(picture[0-9]*|result_image)\s*\}"
+    image_key_pattern = rf"(picture[0-9]+|{re.escape(IMPORT_PICTURE_PREFIX)}[0-9]+)"
+    placeholder_pattern = (
+        rf"\{{\{{\s*{image_key_pattern}\s*\}}\}}"
+        rf"|\{{\s*{image_key_pattern}\s*\}}"
+    )
 
     last_index = 0
     has_match = False
@@ -1827,10 +1850,10 @@ def add_content_with_picture_placeholders_to_story(story, content, data, body_st
             add_text_with_manual_indent_to_story(story, before_text, body_style)
 
         key = match.group(1) or match.group(2)
-        image_path = get_image_path_by_placeholder_key(key, data)
+        image_path = get_image_path_by_placeholder_key(key)
 
         if not image_path:
-            raise ValueError(f"没有找到图片变量：{{{key}}}。请先在绘图页生成对应图片，或选择对应图片。")
+            raise ValueError(f"没有找到图片变量：{{{key}}}。请先生成或导入对应图片。")
 
         append_image_to_story(story, image_path, f"{{{key}}}")
         last_index = match.end()
@@ -1844,28 +1867,15 @@ def add_content_with_picture_placeholders_to_story(story, content, data, body_st
         return
 
 
-def content_has_result_image_placeholder(content):
-    """
-    判断正文是否已经手动放置了 result_image 图片占位符。
-    """
-
-    return re.search(r"\{\{\s*result_image\s*}}|\{\s*result_image\s*}", content) is not None
-
-
 def add_report_sections_to_story(story, template, data, heading_style, body_style, normal_style, font_name):
     """
     将模板中的预设章节加入 PDF 内容流。
     支持：
     1. 普通字符串段落；
-    2. 图片占位符 {picture}、{picture1}、{result_image}；
-    3. 三线表对象：
-       {
-         "type": "three_line_table",
-         "title": "...",
-         "headers": [...],
-         "rows": [...],
-         "col_widths_mm": [...]
-       }
+    2. 图片占位符 {picture1}、{import_picture1}；
+    3. 三线表对象；
+    4. 预设图片对象；
+    5. 填写区 grid_table 对象。
     """
 
     for section in template.get("sections", []):
@@ -1873,8 +1883,6 @@ def add_report_sections_to_story(story, template, data, heading_style, body_styl
         content = section.get("content", "")
 
         story.append(Paragraph(safe_paragraph_text(heading), heading_style))
-
-        has_result_image_placeholder = False
 
         if isinstance(content, list):
             for content_item in content:
@@ -1913,31 +1921,20 @@ def add_report_sections_to_story(story, template, data, heading_style, body_styl
                 else:
                     rendered_content = render_template_text(str(content_item), data)
 
-                    if content_has_result_image_placeholder(rendered_content):
-                        has_result_image_placeholder = True
-
                     add_content_with_picture_placeholders_to_story(
                         story=story,
                         content=rendered_content,
-                        data=data,
                         body_style=body_style
                     )
 
         else:
             rendered_content = render_template_text(str(content), data)
 
-            if content_has_result_image_placeholder(rendered_content):
-                has_result_image_placeholder = True
-
             add_content_with_picture_placeholders_to_story(
                 story=story,
                 content=rendered_content,
-                data=data,
                 body_style=body_style
             )
-
-        if is_result_section_heading(heading) and not has_result_image_placeholder:
-            add_result_image_to_story(story, data)
 
         story.append(Spacer(1, 4))
 
@@ -2373,7 +2370,6 @@ def rebuild_form(form_layout, input_widgets, template):
 
     clear_layout(form_layout)
     input_widgets.clear()
-    ensure_result_image_field(template)
 
     for field in template.get("fields", []):
         key = field.get("key")
@@ -2504,6 +2500,101 @@ def build_three_line_table_preview(table_config, data):
     return "\n".join(lines)
 
 
+def get_picture_key_sort_number(picture_key):
+    """
+    从 picture1、picture2 这类变量名中提取数字，用于正确排序。
+    """
+
+    match = re.search(r"\d+", str(picture_key))
+
+    if match:
+        return int(match.group())
+
+    return 0
+
+
+def build_report_hint_text():
+    """
+    生成报告生成页右下角的提示文本。
+    包括：
+    1. 当前可用绘图图片变量；
+    2. 当前可用导入图片变量；
+    3. 常用正文标记；
+    4. 图片插入提示。
+    """
+
+    lines = ["【绘图图片变量】"]
+
+    generated_pictures = APP_STATE["generated_pictures"]
+    picture_sources = APP_STATE.get("picture_sources", {})
+
+    picture_names = sorted(
+        (
+            key for key in generated_pictures.keys()
+            if re.fullmatch(r"picture[0-9]+", key) is not None
+        ),
+        key=get_picture_key_sort_number
+    )
+
+    if picture_names:
+        for key in picture_names:
+            source_name = str(picture_sources.get(key, "")).strip()
+
+            if source_name:
+                lines.append(f"{{{key}}}：来自“{source_name}”")
+            else:
+                lines.append(f"{{{key}}}：来源未知")
+    else:
+        lines.append("当前没有绘图图片变量。")
+        lines.append("在“实验数据绘图”页点击“绘图”后，会生成 {picture1}、{picture2} 等变量。")
+
+    lines.append("")
+    lines.append("【导入图片变量】")
+
+    import_pictures = APP_STATE["import_pictures"]
+    import_picture_sources = APP_STATE.get("import_picture_sources", {})
+
+    import_picture_names = sorted(
+        (
+            key for key in import_pictures.keys()
+            if is_import_picture_placeholder_key(key)
+        ),
+        key=get_picture_key_sort_number
+    )
+
+    if import_picture_names:
+        for key in import_picture_names:
+            source_name = str(import_picture_sources.get(key, "")).strip()
+
+            if source_name:
+                lines.append(f"{{{key}}}：来自文件“{source_name}”")
+            else:
+                lines.append(f"{{{key}}}：来源未知")
+    else:
+        lines.append("当前没有导入图片变量。")
+        lines.append("{import_picture1}、{import_picture2} 等变量会在点击“导入图片”后生成。")
+
+    lines.append("")
+    lines.append("【常用标记】")
+    lines.append("下标：E[sub=pc]，PDF 中 pc 会显示为下标。")
+    lines.append("上标：10[sup=-3]，PDF 中 -3 会显示为上标。")
+
+    lines.append("")
+    lines.append("【图片插入】")
+    lines.append("插入绘图图片：{picture1}、{picture2} ...")
+    lines.append("插入导入图片：{import_picture1}、{import_picture2} ...")
+
+    return "\n".join(lines)
+
+
+def update_report_hint(hint_edit):
+    """
+    刷新提示框内容。
+    """
+
+    hint_edit.setPlainText(build_report_hint_text())
+
+
 def build_preview_text(template, data):
     """
     生成纯文本预览内容。
@@ -2538,8 +2629,6 @@ def build_preview_text(template, data):
 
         lines.append(heading)
 
-        has_result_image_placeholder = False
-
         if isinstance(content, list):
             for content_item in content:
                 if isinstance(content_item, dict):
@@ -2571,38 +2660,15 @@ def build_preview_text(template, data):
 
                 else:
                     rendered_content = render_template_text(str(content_item), data)
-
-                    if content_has_result_image_placeholder(rendered_content):
-                        has_result_image_placeholder = True
-
                     preview_content = strip_manual_indent_markers(rendered_content)
                     preview_content = plain_inline_markup_for_gui(preview_content)
                     lines.append(preview_content)
 
         else:
             rendered_content = render_template_text(str(content), data)
-
-            if content_has_result_image_placeholder(rendered_content):
-                has_result_image_placeholder = True
-
             preview_content = strip_manual_indent_markers(rendered_content)
             preview_content = plain_inline_markup_for_gui(preview_content)
             lines.append(preview_content)
-
-        if is_result_section_heading(heading):
-            image_path = data.get("result_image", "").strip()
-            if image_path and not has_result_image_placeholder:
-                lines.append(f"[实验结果图片] {image_path}")
-
-        generated_pictures = APP_STATE["generated_pictures"]
-        if generated_pictures:
-            picture_names = sorted(
-                key for key in generated_pictures.keys()
-                if re.fullmatch(r"picture[0-9]+", key) is not None
-            )
-            if picture_names:
-                lines.append("[已生成图片变量] " + "，".join(f"{{{key}}}" for key in picture_names))
-                lines.append("[最新图片变量] {picture}")
 
         lines.append("")
 
@@ -2738,6 +2804,9 @@ def build_main_window():
     template_combo.addItems(REPORT_TEMPLATES.keys())
     top_layout.addWidget(template_combo)
 
+    import_picture_button = QPushButton("导入外部图片")
+    top_layout.addWidget(import_picture_button)
+
     preview_button = QPushButton("刷新预览")
     top_layout.addWidget(preview_button)
 
@@ -2766,7 +2835,10 @@ def build_main_window():
 
     content_layout.addWidget(form_group, stretch=1)
 
-    # 右侧预览区
+    # 右侧区域：上方报告预览，下方提示框
+    right_splitter = QSplitter(Qt.Orientation.Vertical)
+
+    # 右上：报告预览
     preview_group = QGroupBox("报告预览")
     preview_group_layout = QVBoxLayout(preview_group)
 
@@ -2774,7 +2846,23 @@ def build_main_window():
     preview_edit.setReadOnly(True)
     preview_group_layout.addWidget(preview_edit)
 
-    content_layout.addWidget(preview_group, stretch=1)
+    # 右下：使用提示
+    hint_group = QGroupBox("使用提示")
+    hint_group_layout = QVBoxLayout(hint_group)
+
+    hint_edit = QTextEdit()
+    hint_edit.setReadOnly(True)
+    hint_edit.setMinimumHeight(130)
+    hint_edit.setMaximumHeight(220)
+    hint_group_layout.addWidget(hint_edit)
+
+    right_splitter.addWidget(preview_group)
+    right_splitter.addWidget(hint_group)
+
+    right_splitter.setStretchFactor(0, 4)
+    right_splitter.setStretchFactor(1, 1)
+
+    content_layout.addWidget(right_splitter, stretch=1)
 
     # 用字典保存输入控件
     input_widgets = {}
@@ -2787,21 +2875,71 @@ def build_main_window():
 
         rebuild_form(form_layout, input_widgets, template)
         update_preview(template_combo, input_widgets, preview_edit)
+        update_report_hint(hint_edit)
 
     def refresh_current_preview():
-        # 刷新右侧文本预览。
+        # 刷新右侧文本预览和提示信息。
 
         update_preview(template_combo, input_widgets, preview_edit)
+        update_report_hint(hint_edit)
+
+    def import_pictures_from_files():
+        # 从本地选择一张或多张图片，并生成 import_picture 数字变量。
+
+        image_paths, _ = QFileDialog.getOpenFileNames(
+            window,
+            "导入图片",
+            "",
+            "Image Files (*.png *.jpg *.jpeg *.bmp)"
+        )
+
+        if not image_paths:
+            return
+
+        new_keys = []
+
+        try:
+            for image_path in image_paths:
+                new_key = save_import_picture_to_picture_store(image_path)
+                new_keys.append(new_key)
+
+                # 每导入一张图片，就刷新一次提示区文本。
+                update_report_hint(hint_edit)
+
+            update_preview(template_combo, input_widgets, preview_edit)
+
+            if new_keys:
+                QMessageBox.information(
+                    window,
+                    "导入成功",
+                    "已生成图片变量：\n" + "\n".join(f"{{{key}}}" for key in new_keys)
+                )
+
+        except Exception as error:
+            QMessageBox.critical(
+                window,
+                "导入失败",
+                str(error)
+            )
 
     def export_current_pdf():
         # 导出当前模板对应的 PDF。
 
         export_pdf(window, template_combo, input_widgets)
 
+    # 让外部窗口也能触发报告页刷新
+    def refresh_report_page_from_outside():
+        # 从其他标签页切换回来时，同时刷新报告预览和提示框。
+        update_preview(template_combo, input_widgets, preview_edit)
+        update_report_hint(hint_edit)
+
+    window.refresh_report_page = refresh_report_page_from_outside
+
     # -------------------------------
     # 绑定按钮事件
     # -------------------------------
     template_combo.currentTextChanged.connect(refresh_current_form)
+    import_picture_button.clicked.connect(import_pictures_from_files)
     preview_button.clicked.connect(refresh_current_preview)
     export_button.clicked.connect(export_current_pdf)
 
@@ -2826,11 +2964,20 @@ def build_integrated_window():
     plot_window = build_plot_window()
     report_window = build_main_window()
 
-    tabs.addTab(plot_window, "实验数据绘图")
-    tabs.addTab(report_window, "实验报告生成")
+    plot_tab_index = tabs.addTab(plot_window, "实验数据绘图")
+    report_tab_index = tabs.addTab(report_window, "实验报告生成")
+
+    def handle_tab_changed(index):
+        # 切换到“实验报告生成”页时，刷新报告预览和图片变量提示。
+        if index == report_tab_index and hasattr(report_window, "refresh_report_page"):
+            report_window.refresh_report_page()
+
+    tabs.currentChanged.connect(handle_tab_changed)
 
     window.plot_window = plot_window
     window.report_window = report_window
+    window.plot_tab_index = plot_tab_index
+    window.report_tab_index = report_tab_index
 
     return window
 

@@ -66,6 +66,13 @@
             "type": "text",
             "required": true,
             "default": ""
+        },
+              {
+            "key": "question_2",
+            "label": "六、思考题2",
+            "type": "text",
+            "required": true,
+            "default": ""
         }
     ],
 
