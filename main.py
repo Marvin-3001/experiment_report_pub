@@ -33,7 +33,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
 
 APP_STATE = {
     "picture_counter": 0,
-    "generated_pictures": {}
+    "generated_pictures": {},
+    "picture_sources": {}
 }
 
 CHINESE_FONT_NAME = "STSong-Light"
@@ -306,13 +307,9 @@ def save_generated_plot_to_picture_store(state):
     state["figure"].savefig(str(picture_path), dpi=300, bbox_inches="tight")
 
     APP_STATE["generated_pictures"][picture_key] = str(picture_path)
-    APP_STATE["generated_pictures"]["picture"] = str(picture_path)
-
-    picture_label = state.get("picture_label")
-    if picture_label is not None:
-        picture_label.setText(
-            f"当前图片变量：{{{picture_key}}}；最新图片也可用 {{picture}}"
-        )
+    APP_STATE["picture_sources"][picture_key] = str(
+        state.get("current_experiment", "")
+    ).strip()
 
 
 def plot_current_experiment(state):
@@ -857,9 +854,6 @@ def build_plot_window():
     btn_save = QPushButton("导出图片")
     control_layout.addWidget(btn_save)
 
-    picture_label = QLabel("当前图片变量：无")
-    control_layout.addWidget(picture_label)
-
     control_layout.addStretch()
 
     # 下方表格区和图片区
@@ -934,7 +928,6 @@ def build_plot_window():
         "canvas": canvas,
         "experiments": experiments,
         "current_experiment": None,
-        "picture_label": picture_label
     }
 
     # 下拉框加入实验名称
@@ -1369,7 +1362,7 @@ def is_picture_placeholder_key(key):
     """
 
     key = str(key).strip()
-    return key == "picture" or key == "result_image" or re.fullmatch(r"picture[0-9]+", key) is not None
+    return key == "result_image" or re.fullmatch(r"picture[0-9]+", key) is not None
 
 
 def get_image_path_by_placeholder_key(key, data):
@@ -1808,13 +1801,12 @@ def add_content_with_picture_placeholders_to_story(story, content, data, body_st
     """
     按正文中的图片占位符顺序加入文字和图片。
     支持：
-    1. {picture}：最近一次绘图；
-    2. {picture1}、{picture2} ...：第 1、2 ... 次绘图；
-    3. {result_image}：手动选择的实验结果图片；
-    4. {{ picture }}、{{ picture1 }}、{{ result_image }}：双大括号兼容写法。
+    1. {picture1}、{picture2} ...：第 1、2 ... 次绘图；
+    2. {result_image}：手动选择的实验结果图片；
+    3. {{ picture1 }}、{{ result_image }}：双大括号兼容写法。
     """
 
-    placeholder_pattern = r"\{\{\s*(picture[0-9]*|result_image)\s*\}\}|\{\s*(picture[0-9]*|result_image)\s*\}"
+    placeholder_pattern = r"\{\{\s*(picture[0-9]+|result_image)\s*\}\}|\{\s*(picture[0-9]+|result_image)\s*\}"
 
     last_index = 0
     has_match = False
@@ -2504,13 +2496,27 @@ def build_three_line_table_preview(table_config, data):
     return "\n".join(lines)
 
 
+def get_picture_key_sort_number(picture_key):
+    """
+    从 picture1、picture2 这类变量名中提取数字，用于正确排序。
+    """
+
+    match = re.search(r"\d+", str(picture_key))
+
+    if match:
+        return int(match.group())
+
+    return 0
+
+
 def build_report_hint_text():
     """
     生成报告生成页右下角的提示文本。
     包括：
     1. 当前可用图片变量；
-    2. 常用正文标记；
-    3. 图片插入提示。
+    2. 每个图片变量来自哪个绘图模块；
+    3. 常用正文标记；
+    4. 图片插入提示。
     """
 
     lines = []
@@ -2518,30 +2524,36 @@ def build_report_hint_text():
     lines.append("【图片变量】")
 
     generated_pictures = APP_STATE["generated_pictures"]
+    picture_sources = APP_STATE.get("picture_sources", {})
 
     picture_names = sorted(
-        key for key in generated_pictures.keys()
-        if re.fullmatch(r"picture[0-9]+", key) is not None
+        (
+            key for key in generated_pictures.keys()
+            if re.fullmatch(r"picture[0-9]+", key) is not None
+        ),
+        key=get_picture_key_sort_number
     )
 
     if picture_names:
         for key in picture_names:
-            lines.append(f"{{{key}}}")
+            source_name = str(picture_sources.get(key, "")).strip()
 
-        if "picture" in generated_pictures:
-            latest_key = picture_names[-1]
-            lines.append(f"{{picture}} = 最新图片，当前等同于 {{{latest_key}}}")
+            if source_name:
+                lines.append(f"{{{key}}}：来自“{source_name}”")
+            else:
+                lines.append(f"{{{key}}}：来源未知")
     else:
         lines.append("当前没有生成图片变量。")
         lines.append("在“实验数据绘图”页点击“绘图”后，会生成 {picture1}、{picture2} 等变量。")
 
+    lines.append("")
     lines.append("【常用标记】")
-    lines.append("下标：E[sub=pc]，PDF 中pc显示为下标。")
-    lines.append("上标：10[sup=-3]，PDF 中-3显示为上标。")
+    lines.append("下标：E[sub=pc]，PDF 中 pc 会显示为下标。")
+    lines.append("上标：10[sup=-3]，PDF 中 -3 会显示为上标。")
 
+    lines.append("")
     lines.append("【图片插入】")
     lines.append("插入指定绘图：{picture1}、{picture2} ...")
-    lines.append("插入最新绘图：{picture}")
     lines.append("插入手动选择图片：{result_image}")
 
     return "\n".join(lines)
@@ -2644,16 +2656,6 @@ def build_preview_text(template, data):
             image_path = data.get("result_image", "").strip()
             if image_path and not has_result_image_placeholder:
                 lines.append(f"[实验结果图片] {image_path}")
-
-        generated_pictures = APP_STATE["generated_pictures"]
-        if generated_pictures:
-            picture_names = sorted(
-                key for key in generated_pictures.keys()
-                if re.fullmatch(r"picture[0-9]+", key) is not None
-            )
-            if picture_names:
-                lines.append("[已生成图片变量] " + "，".join(f"{{{key}}}" for key in picture_names))
-                lines.append("[最新图片变量] {picture}")
 
         lines.append("")
 
