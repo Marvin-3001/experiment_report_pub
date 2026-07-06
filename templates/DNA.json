@@ -61,14 +61,14 @@
             "rows":2,
             "cols":23,
             "col_widths_px":[50,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30],
-            "row_widths_px":[30,30],
+            "row_heights_px":[30,30],
             "cells":[
                 {"row":0,"col":0,"text":"λ[sub=ex]/nm","readonly":true},
                 {"row":1,"col":0,"text":"F","readonly":true}
             ]
         },
         {
-            "key":"λex",
+            "key":"lambda_ex",
             "label":"λex=",
             "type":"text",
             "required":true,
@@ -82,14 +82,14 @@
             "rows":2,
             "cols":23,
             "col_widths_px":[50,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30],
-            "row_widths_px":[30,30],
+            "row_heights_px":[30,30],
             "cells":[
                 {"row":0,"col":0,"text":"λ[sub=em]/nm","readonly":true},
                 {"row":1,"col":0,"text":"F","readonly":true}
             ]
         },
         {
-            "key":"λem",
+            "key":"lambda_em",
             "label":"λem=",
             "type":"text",
             "required":true,
@@ -103,7 +103,7 @@
             "rows":3,
             "cols":9,
             "col_widths_px":[70,40,40,40,40,40,40,40,40],
-            "row_widths_px":[40,30,30],
+            "row_heights_px":[40,30,30],
             "cells":[
                 {"row":0,"col":0,"text":"V[sub=标液或样品](mL)","readonly":true},
                 {"row":1,"col":0,"text":"C[sub=DNA](µg/mL)","readonly":true},
@@ -197,26 +197,26 @@
                     "field_key":"1_table",
                     "title":"表1 激光光谱结果",
                     "col_widths_mm":[14,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
-                    "row_widths_mm":[30,30],
+                    "row_heights_mm":[30,30],
                     "keep_together":true
                 },
-                "[indent=42]λ[sub=ex]={{λex}}nm",
+                "[indent=42]λ[sub=ex]={{lambda_ex}}nm",
                 {
                     "type":"grid_table",
                     "field_key":"2_table",
                     "title":"表2 发射光谱结果",
                     "col_widths_mm":[14,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
-                    "row_widths_mm":[30,30],
+                    "row_heights_mm":[30,30],
                     "keep_together":true
                 },
-                "[indent=42]λ[sub=em]={{λem}}nm",
+                "[indent=42]λ[sub=em]={{lambda_em}}nm",
                 "2.标准曲线的绘制及未知液的测定",
                 {
                     "type":"grid_table",
                     "field_key":"standard_curve",
                     "title":"表3 标准系列及样品测定结果",
                     "col_widths_mm":[28,15,15,15,15,15,15,15,15],
-                    "row_widths_mm":[30,30,30],
+                    "row_heights_mm":[30,30,30],
                     "keep_together":true
                 },
                 "[indent=21]回归曲线方程：{{fac}}；相关系数{{para}}。",

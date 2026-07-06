@@ -162,15 +162,15 @@
             "heading":"七、思考题",
             "content":[
                 "[indent=21]1.过高或过低流动相速度为什么使柱效下降？",
-                "[indent=21]question_1",
+                "[indent=21]{{question_1}}",
                 "[indent=21]2.若载气改变H[sub=2]后，预测H-u曲线的变化，并解释原因。",
-                "[indent=21]question_2",
+                "[indent=21]{{question_2}}",
                 "[indent=21]3.在得H-u曲线后，你能利用它求出简化范氏方程中的常数A、B和C吗？",
-                "[indent=21]question_3",
+                "[indent=21]{{question_3}}",
                 "[indent=21]4.阅读注意事项4，回答不这样做可能造成什么恶果。",
-                "[indent=21]question_4",
+                "[indent=21]{{question_4}}",
                 "[indent=21]5.柱前压力表读数为0.1MPa，则柱入口载气压力就是0.1MPa吗?为什么？",
-                "[indent=21]question_5"
+                "[indent=21]{{question_5}}"
             ]
         }
     ]
