@@ -2504,6 +2504,57 @@ def build_three_line_table_preview(table_config, data):
     return "\n".join(lines)
 
 
+def build_report_hint_text():
+    """
+    生成报告生成页右下角的提示文本。
+    包括：
+    1. 当前可用图片变量；
+    2. 常用正文标记；
+    3. 图片插入提示。
+    """
+
+    lines = []
+
+    lines.append("【图片变量】")
+
+    generated_pictures = APP_STATE["generated_pictures"]
+
+    picture_names = sorted(
+        key for key in generated_pictures.keys()
+        if re.fullmatch(r"picture[0-9]+", key) is not None
+    )
+
+    if picture_names:
+        for key in picture_names:
+            lines.append(f"{{{key}}}")
+
+        if "picture" in generated_pictures:
+            latest_key = picture_names[-1]
+            lines.append(f"{{picture}} = 最新图片，当前等同于 {{{latest_key}}}")
+    else:
+        lines.append("当前没有生成图片变量。")
+        lines.append("在“实验数据绘图”页点击“绘图”后，会生成 {picture1}、{picture2} 等变量。")
+
+    lines.append("【常用标记】")
+    lines.append("下标：E[sub=pc]，PDF 中pc显示为下标。")
+    lines.append("上标：10[sup=-3]，PDF 中-3显示为上标。")
+
+    lines.append("【图片插入】")
+    lines.append("插入指定绘图：{picture1}、{picture2} ...")
+    lines.append("插入最新绘图：{picture}")
+    lines.append("插入手动选择图片：{result_image}")
+
+    return "\n".join(lines)
+
+
+def update_report_hint(hint_edit):
+    """
+    刷新提示框内容。
+    """
+
+    hint_edit.setPlainText(build_report_hint_text())
+
+
 def build_preview_text(template, data):
     """
     生成纯文本预览内容。
@@ -2766,7 +2817,10 @@ def build_main_window():
 
     content_layout.addWidget(form_group, stretch=1)
 
-    # 右侧预览区
+    # 右侧区域：上方报告预览，下方提示框
+    right_splitter = QSplitter(Qt.Orientation.Vertical)
+
+    # 右上：报告预览
     preview_group = QGroupBox("报告预览")
     preview_group_layout = QVBoxLayout(preview_group)
 
@@ -2774,7 +2828,23 @@ def build_main_window():
     preview_edit.setReadOnly(True)
     preview_group_layout.addWidget(preview_edit)
 
-    content_layout.addWidget(preview_group, stretch=1)
+    # 右下：使用提示
+    hint_group = QGroupBox("使用提示")
+    hint_group_layout = QVBoxLayout(hint_group)
+
+    hint_edit = QTextEdit()
+    hint_edit.setReadOnly(True)
+    hint_edit.setMinimumHeight(130)
+    hint_edit.setMaximumHeight(220)
+    hint_group_layout.addWidget(hint_edit)
+
+    right_splitter.addWidget(preview_group)
+    right_splitter.addWidget(hint_group)
+
+    right_splitter.setStretchFactor(0, 4)
+    right_splitter.setStretchFactor(1, 1)
+
+    content_layout.addWidget(right_splitter, stretch=1)
 
     # 用字典保存输入控件
     input_widgets = {}
@@ -2787,16 +2857,26 @@ def build_main_window():
 
         rebuild_form(form_layout, input_widgets, template)
         update_preview(template_combo, input_widgets, preview_edit)
+        update_report_hint(hint_edit)
 
     def refresh_current_preview():
-        # 刷新右侧文本预览。
+        # 刷新右侧文本预览和提示信息。
 
         update_preview(template_combo, input_widgets, preview_edit)
+        update_report_hint(hint_edit)
 
     def export_current_pdf():
         # 导出当前模板对应的 PDF。
 
         export_pdf(window, template_combo, input_widgets)
+
+    # 让外部窗口也能触发报告页刷新
+    def refresh_report_page_from_outside():
+        # 从其他标签页切换回来时，同时刷新报告预览和提示框。
+        update_preview(template_combo, input_widgets, preview_edit)
+        update_report_hint(hint_edit)
+
+    window.refresh_report_page = refresh_report_page_from_outside
 
     # -------------------------------
     # 绑定按钮事件
@@ -2826,11 +2906,20 @@ def build_integrated_window():
     plot_window = build_plot_window()
     report_window = build_main_window()
 
-    tabs.addTab(plot_window, "实验数据绘图")
-    tabs.addTab(report_window, "实验报告生成")
+    plot_tab_index = tabs.addTab(plot_window, "实验数据绘图")
+    report_tab_index = tabs.addTab(report_window, "实验报告生成")
+
+    def handle_tab_changed(index):
+        # 切换到“实验报告生成”页时，刷新报告预览和图片变量提示。
+        if index == report_tab_index and hasattr(report_window, "refresh_report_page"):
+            report_window.refresh_report_page()
+
+    tabs.currentChanged.connect(handle_tab_changed)
 
     window.plot_window = plot_window
     window.report_window = report_window
+    window.plot_tab_index = plot_tab_index
+    window.report_tab_index = report_tab_index
 
     return window
 
