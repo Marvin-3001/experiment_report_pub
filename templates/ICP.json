@@ -115,7 +115,7 @@
             ["重复次数", "3"]
           ],
           "col_widths_mm": [60, 50],
-          "keep_together": false
+          "keep_together": true
         },
         {
           "type": "three_line_table",
