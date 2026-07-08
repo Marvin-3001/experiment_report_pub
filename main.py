@@ -536,9 +536,9 @@ def enable_excel_navigation(table):
 
 
 # =========================================================
-# 1：离子选择性电极测定氟离子
+# 通用线性标准曲线绘图
 # =========================================================
-def plot_calibration1(state):
+def plot_linear_calibration(state, title, xlabel, ylabel):
     table = state["table"]
     figure = state["figure"]
     canvas = state["canvas"]
@@ -550,11 +550,9 @@ def plot_calibration1(state):
     if len(x) < 2:
         raise ValueError("标准曲线至少需要 2 个数据点。")
 
-    # 一次线性拟合
     slope, intercept = np.polyfit(x, y, 1)
     y_fit = slope * x + intercept
 
-    # 计算 R^2
     ss_res = np.sum((y - y_fit) ** 2)
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
@@ -569,9 +567,9 @@ def plot_calibration1(state):
     ax.scatter(x, y, s=40, label="Data")
     ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
 
-    ax.set_title("Calibration Curve")
-    ax.set_xlabel("lgC F-")
-    ax.set_ylabel("Voltage")
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.3)
     ax.legend()
 
@@ -585,57 +583,29 @@ def plot_calibration1(state):
     )
 
     canvas.draw()
+
+
+# =========================================================
+# 1：离子选择性电极测定氟离子
+# =========================================================
+def plot_calibration1(state):
+    plot_linear_calibration(
+        state,
+        title="Calibration Curve",
+        xlabel="lgC F-",
+        ylabel="Voltage"
+    )
 
 # =========================================================
 # 2: 甲苯，萘的高效液相色谱分析
 # =========================================================
 def plot_calibration2(state):
-    table = state["table"]
-    figure = state["figure"]
-    canvas = state["canvas"]
-
-    arr = read_numeric_columns(table, 2)
-    x = arr[:, 0]
-    y = arr[:, 1]
-
-    if len(x) < 2:
-        raise ValueError("标准曲线至少需要 2 个数据点。")
-
-    # 一次线性拟合
-    slope, intercept = np.polyfit(x, y, 1)
-    y_fit = slope * x + intercept
-
-    # 计算 R^2
-    ss_res = np.sum((y - y_fit) ** 2)
-    ss_tot = np.sum((y - np.mean(y)) ** 2)
-    r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
-
-    sort_idx = np.argsort(x)
-    x_sorted = x[sort_idx]
-    y_fit_sorted = y_fit[sort_idx]
-
-    figure.clear()
-    ax = figure.add_subplot(111)
-
-    ax.scatter(x, y, s=40, label="Data")
-    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
-
-    ax.set_title("Calibration Curve")
-    ax.set_xlabel("Concentration")
-    ax.set_ylabel("Response")
-    ax.grid(True, alpha=0.3)
-    ax.legend()
-
-    eq_text = f"y = {slope:.4f}x + {intercept:.4f}\nR² = {r2:.4f}"
-    ax.text(
-        0.05, 0.95,
-        eq_text,
-        transform=ax.transAxes,
-        verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+    plot_linear_calibration(
+        state,
+        title="Calibration Curve",
+        xlabel="Concentration",
+        ylabel="Response"
     )
-
-    canvas.draw()
 
 
 # =========================================================
@@ -697,53 +667,12 @@ def plot_point(state):
 # 4: ICP-OES的多元素同时测定, 5: 火焰原子吸收测定水样中的钾, 6: 原子荧光法测定天然水中砷和汞, 7: 吖啶橙荧光探针法测定DNA
 # =========================================================
 def plot_calibration3(state):
-    table = state["table"]
-    figure = state["figure"]
-    canvas = state["canvas"]
-
-    arr = read_numeric_columns(table, 2)
-
-    x = arr[:, 0]
-    y = arr[:, 1]
-
-    if len(x) < 2:
-        raise ValueError("标准曲线至少需要 2 个数据点。")
-
-    # 一次线性拟合
-    slope, intercept = np.polyfit(x, y, 1)
-    y_fit = slope * x + intercept
-
-    # 计算 R^2
-    ss_res = np.sum((y - y_fit) ** 2)
-    ss_tot = np.sum((y - np.mean(y)) ** 2)
-    r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
-
-    sort_idx = np.argsort(x)
-    x_sorted = x[sort_idx]
-    y_fit_sorted = y_fit[sort_idx]
-
-    figure.clear()
-    ax = figure.add_subplot(111)
-
-    ax.scatter(x, y, s=40, label="Data")
-    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
-
-    ax.set_title("Calibration Curve")
-    ax.set_xlabel("Concentration")
-    ax.set_ylabel("Signal")
-    ax.grid(True, alpha=0.3)
-    ax.legend()
-
-    eq_text = f"y = {slope:.4f}x + {intercept:.4f}\nR² = {r2:.4f}"
-    ax.text(
-        0.05, 0.95,
-        eq_text,
-        transform=ax.transAxes,
-        verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+    plot_linear_calibration(
+        state,
+        title="Calibration Curve",
+        xlabel="Concentration",
+        ylabel="Signal"
     )
-
-    canvas.draw()
 
 
 # =========================================================
