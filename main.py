@@ -12,7 +12,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import mm
 from xml.sax.saxutils import escape
 from scipy.optimize import curve_fit
-from matplotlib import font_manager
+from matplotlib import font_manager, rcParams
 from matplotlib.figure import Figure
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
@@ -46,6 +46,49 @@ APP_STATE = {
 
 CHINESE_FONT_NAME = "STSong-Light"
 WESTERN_FONT_NAME = "TimesNewRoman"
+MATPLOTLIB_WESTERN_FONT_NAME = "Times New Roman"
+MATPLOTLIB_CHINESE_FONT_CANDIDATES = [
+    "SimSun",
+    "宋体",
+    "Microsoft YaHei",
+    "SimHei",
+    "Noto Sans CJK SC"
+]
+
+
+def find_available_matplotlib_font(font_names):
+    for font_name in font_names:
+        try:
+            font_path = font_manager.findfont(
+                font_name,
+                fallback_to_default=False
+            )
+        except (ValueError, RuntimeError, OSError):
+            continue
+
+        if Path(font_path).exists():
+            return font_name
+
+    return None
+
+
+MATPLOTLIB_CHINESE_FONT_NAME = find_available_matplotlib_font(
+    MATPLOTLIB_CHINESE_FONT_CANDIDATES
+)
+
+
+def setup_matplotlib_fonts():
+    font_families = [MATPLOTLIB_WESTERN_FONT_NAME]
+
+    if MATPLOTLIB_CHINESE_FONT_NAME:
+        font_families.append(MATPLOTLIB_CHINESE_FONT_NAME)
+
+    rcParams["font.family"] = font_families
+    rcParams["font.sans-serif"] = font_families
+    rcParams["axes.unicode_minus"] = False
+
+
+setup_matplotlib_fonts()
 
 def find_times_new_roman_path():
     """
@@ -291,6 +334,20 @@ def change_experiment(state, experiment_name):
 
     state["current_experiment"] = experiment_name
     setup_table(state["table"], config)
+    plot_labels = config.get("plot_labels", {})
+
+    label_widgets = [
+        ("plot_title_edit", "title"),
+        ("plot_xlabel_edit", "xlabel"),
+        ("plot_ylabel_edit", "ylabel")
+    ]
+
+    for widget_key, label_key in label_widgets:
+        widget = state.get(widget_key)
+
+        if widget is not None:
+            widget.setText(str(plot_labels.get(label_key, "")))
+
     clear_plot(state)
 
 
@@ -536,12 +593,56 @@ def enable_excel_navigation(table):
 
 
 # =========================================================
-# 1：离子选择性电极测定氟离子
+# 绘图标题与字体辅助函数
 # =========================================================
-def plot_calibration1(state):
+def get_plot_label_text(state, widget_key, default_text):
+    widget = state.get(widget_key)
+
+    if widget is None:
+        return default_text
+
+    text = widget.text().strip()
+
+    if text:
+        return text
+
+    return default_text
+
+
+def get_plot_font_families():
+    font_families = [MATPLOTLIB_WESTERN_FONT_NAME]
+
+    if MATPLOTLIB_CHINESE_FONT_NAME:
+        font_families.append(MATPLOTLIB_CHINESE_FONT_NAME)
+
+    return font_families
+
+
+def apply_plot_text_fonts(ax, extra_text_items=None, legend=None):
+    font_families = get_plot_font_families()
+
+    ax.title.set_fontfamily(font_families)
+    ax.xaxis.label.set_fontfamily(font_families)
+    ax.yaxis.label.set_fontfamily(font_families)
+
+    if legend is not None:
+        for text_item in legend.get_texts():
+            text_item.set_fontfamily(font_families)
+
+    for text_item in extra_text_items or []:
+        text_item.set_fontfamily(font_families)
+
+
+# =========================================================
+# 通用线性标准曲线绘图
+# =========================================================
+def plot_linear_calibration(state, default_title, default_xlabel, default_ylabel):
     table = state["table"]
     figure = state["figure"]
     canvas = state["canvas"]
+    title = get_plot_label_text(state, "plot_title_edit", default_title)
+    xlabel = get_plot_label_text(state, "plot_xlabel_edit", default_xlabel)
+    ylabel = get_plot_label_text(state, "plot_ylabel_edit", default_ylabel)
 
     arr = read_numeric_columns(table, 2)
     x = arr[:, 0]
@@ -550,11 +651,9 @@ def plot_calibration1(state):
     if len(x) < 2:
         raise ValueError("标准曲线至少需要 2 个数据点。")
 
-    # 一次线性拟合
     slope, intercept = np.polyfit(x, y, 1)
     y_fit = slope * x + intercept
 
-    # 计算 R^2
     ss_res = np.sum((y - y_fit) ** 2)
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
@@ -569,82 +668,73 @@ def plot_calibration1(state):
     ax.scatter(x, y, s=40, label="Data")
     ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
 
-    ax.set_title("Calibration Curve")
-    ax.set_xlabel("lgC F-")
-    ax.set_ylabel("Voltage")
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.3)
-    ax.legend()
+    legend = ax.legend()
 
     eq_text = f"y = {slope:.4f}x + {intercept:.4f}\nR² = {r2:.4f}"
-    ax.text(
+    equation_text = ax.text(
         0.05, 0.95,
         eq_text,
         transform=ax.transAxes,
         verticalalignment="top",
         bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
     )
+    apply_plot_text_fonts(ax, extra_text_items=[equation_text], legend=legend)
 
     canvas.draw()
+
+
+# =========================================================
+# 1：离子选择性电极测定氟离子
+# =========================================================
+def plot_calibration1(
+    state,
+    default_title="Calibration Curve",
+    default_xlabel="lgC F-",
+    default_ylabel="Voltage"
+):
+    plot_linear_calibration(
+        state,
+        default_title=default_title,
+        default_xlabel=default_xlabel,
+        default_ylabel=default_ylabel
+    )
 
 # =========================================================
 # 2: 甲苯，萘的高效液相色谱分析
 # =========================================================
-def plot_calibration2(state):
-    table = state["table"]
-    figure = state["figure"]
-    canvas = state["canvas"]
-
-    arr = read_numeric_columns(table, 2)
-    x = arr[:, 0]
-    y = arr[:, 1]
-
-    if len(x) < 2:
-        raise ValueError("标准曲线至少需要 2 个数据点。")
-
-    # 一次线性拟合
-    slope, intercept = np.polyfit(x, y, 1)
-    y_fit = slope * x + intercept
-
-    # 计算 R^2
-    ss_res = np.sum((y - y_fit) ** 2)
-    ss_tot = np.sum((y - np.mean(y)) ** 2)
-    r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
-
-    sort_idx = np.argsort(x)
-    x_sorted = x[sort_idx]
-    y_fit_sorted = y_fit[sort_idx]
-
-    figure.clear()
-    ax = figure.add_subplot(111)
-
-    ax.scatter(x, y, s=40, label="Data")
-    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
-
-    ax.set_title("Calibration Curve")
-    ax.set_xlabel("Concentration")
-    ax.set_ylabel("Response")
-    ax.grid(True, alpha=0.3)
-    ax.legend()
-
-    eq_text = f"y = {slope:.4f}x + {intercept:.4f}\nR² = {r2:.4f}"
-    ax.text(
-        0.05, 0.95,
-        eq_text,
-        transform=ax.transAxes,
-        verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+def plot_calibration2(
+    state,
+    default_title="Calibration Curve",
+    default_xlabel="Concentration",
+    default_ylabel="Response"
+):
+    plot_linear_calibration(
+        state,
+        default_title=default_title,
+        default_xlabel=default_xlabel,
+        default_ylabel=default_ylabel
     )
-
-    canvas.draw()
 
 
 # =========================================================
 # 3: 气相色谱流动相速度对柱效的影响
 # =========================================================
-def plot_point(state):
+def plot_point(
+    state,
+    default_title="Point Plot",
+    default_xlabel="u",
+    default_ylabel="H"
+):
     table = state["table"]
     figure = state["figure"]
     canvas = state["canvas"]
+    title = get_plot_label_text(state, "plot_title_edit", default_title)
+    xlabel = get_plot_label_text(state, "plot_xlabel_edit", default_xlabel)
+    ylabel = get_plot_label_text(state, "plot_ylabel_edit", default_ylabel)
 
     arr = read_numeric_columns(table, 2)
     x = arr[:, 0]
@@ -677,7 +767,7 @@ def plot_point(state):
 
     ax.plot(X_fit, Y_fit, label="Fit", color='black', linewidth=1, linestyle="--")
 
-    ax.text(
+    equation_text = ax.text(
         0.10, 0.95,
         f"H = {A_fit:.3f} + {B_fit:.3f}/u + {C_fit:.3f}u\nR² = {r2:.4f}",
         transform=ax.transAxes,
@@ -685,10 +775,11 @@ def plot_point(state):
         bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
     )
 
-    ax.set_title("Point Plot")
-    ax.set_xlabel("u")
-    ax.set_ylabel("H")
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.3)
+    apply_plot_text_fonts(ax, extra_text_items=[equation_text])
 
     canvas.draw()
 
@@ -696,63 +787,35 @@ def plot_point(state):
 # =========================================================
 # 4: ICP-OES的多元素同时测定, 5: 火焰原子吸收测定水样中的钾, 6: 原子荧光法测定天然水中砷和汞, 7: 吖啶橙荧光探针法测定DNA
 # =========================================================
-def plot_calibration3(state):
-    table = state["table"]
-    figure = state["figure"]
-    canvas = state["canvas"]
-
-    arr = read_numeric_columns(table, 2)
-
-    x = arr[:, 0]
-    y = arr[:, 1]
-
-    if len(x) < 2:
-        raise ValueError("标准曲线至少需要 2 个数据点。")
-
-    # 一次线性拟合
-    slope, intercept = np.polyfit(x, y, 1)
-    y_fit = slope * x + intercept
-
-    # 计算 R^2
-    ss_res = np.sum((y - y_fit) ** 2)
-    ss_tot = np.sum((y - np.mean(y)) ** 2)
-    r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
-
-    sort_idx = np.argsort(x)
-    x_sorted = x[sort_idx]
-    y_fit_sorted = y_fit[sort_idx]
-
-    figure.clear()
-    ax = figure.add_subplot(111)
-
-    ax.scatter(x, y, s=40, label="Data")
-    ax.plot(x_sorted, y_fit_sorted, linewidth=1.5, label="Fit", linestyle="--")
-
-    ax.set_title("Calibration Curve")
-    ax.set_xlabel("Concentration")
-    ax.set_ylabel("Signal")
-    ax.grid(True, alpha=0.3)
-    ax.legend()
-
-    eq_text = f"y = {slope:.4f}x + {intercept:.4f}\nR² = {r2:.4f}"
-    ax.text(
-        0.05, 0.95,
-        eq_text,
-        transform=ax.transAxes,
-        verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+def plot_calibration3(
+    state,
+    default_title="Calibration Curve",
+    default_xlabel="Concentration",
+    default_ylabel="Signal"
+):
+    plot_linear_calibration(
+        state,
+        default_title=default_title,
+        default_xlabel=default_xlabel,
+        default_ylabel=default_ylabel
     )
-
-    canvas.draw()
 
 
 # =========================================================
 # 7: 吖啶橙荧光探针法测定DNA-光谱图
 # =========================================================
-def plot_line(state):
+def plot_line(
+    state,
+    default_title="Spectrum Plot",
+    default_xlabel="Wavelength",
+    default_ylabel="Intensity"
+):
     table = state["table"]
     figure = state["figure"]
     canvas = state["canvas"]
+    title = get_plot_label_text(state, "plot_title_edit", default_title)
+    xlabel = get_plot_label_text(state, "plot_xlabel_edit", default_xlabel)
+    ylabel = get_plot_label_text(state, "plot_ylabel_edit", default_ylabel)
 
     arr = read_numeric_columns(table, 2)
 
@@ -763,9 +826,10 @@ def plot_line(state):
     ax = figure.add_subplot(111)
     ax.plot(x, y, color="black", linewidth=1, )
 
-    ax.set_title("Spectrum Plot")
-    ax.set_xlabel("Wavelength")
-    ax.set_ylabel("Intensity")
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    apply_plot_text_fonts(ax)
 
     canvas.draw()
 
@@ -777,6 +841,21 @@ PLOT_FUNCTIONS = {
     "calibration3": plot_calibration3,
     "line": plot_line
 }
+
+
+def get_plot_default_labels(plot_func):
+    defaults = plot_func.__defaults__ or ()
+
+    if len(defaults) < 3:
+        return {}
+
+    default_title, default_xlabel, default_ylabel = defaults[-3:]
+
+    return {
+        "title": default_title,
+        "xlabel": default_xlabel,
+        "ylabel": default_ylabel
+    }
 
 
 def build_qtable_style(style_config):
@@ -885,12 +964,15 @@ def load_plot_experiment_configs(config_dir):
             else:
                 style_config = {}
 
+            plot_func = PLOT_FUNCTIONS[plot_type]
+
             experiments[name] = {
                 "headers": headers,
                 "rows": rows,
                 "cols": cols,
                 "style": build_qtable_style(style_config),
-                "plot_func": PLOT_FUNCTIONS[plot_type]
+                "plot_func": plot_func,
+                "plot_labels": get_plot_default_labels(plot_func)
             }
 
     return experiments
@@ -938,6 +1020,27 @@ def build_plot_window():
     control_layout.addWidget(btn_save)
 
     control_layout.addStretch()
+
+    # 图标题和坐标轴标题：同一行，留空时使用当前实验默认值
+    label_panel = QWidget()
+    label_layout = QHBoxLayout(label_panel)
+    label_layout.setContentsMargins(0, 0, 0, 0)
+    root_layout.addWidget(label_panel, 0)
+
+    plot_title_edit = QLineEdit()
+    plot_xlabel_edit = QLineEdit()
+    plot_ylabel_edit = QLineEdit()
+
+    plot_title_edit.setPlaceholderText("默认图标题")
+    plot_xlabel_edit.setPlaceholderText("默认 X 轴标题")
+    plot_ylabel_edit.setPlaceholderText("默认 Y 轴标题")
+
+    label_layout.addWidget(QLabel("图标题："))
+    label_layout.addWidget(plot_title_edit, stretch=2)
+    label_layout.addWidget(QLabel("X轴标题："))
+    label_layout.addWidget(plot_xlabel_edit, stretch=1)
+    label_layout.addWidget(QLabel("Y轴标题："))
+    label_layout.addWidget(plot_ylabel_edit, stretch=1)
 
     # 下方表格区和图片区
     splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -1012,6 +1115,9 @@ def build_plot_window():
         "experiments": experiments,
         "current_experiment": None,
         "has_current_plot": False,
+        "plot_title_edit": plot_title_edit,
+        "plot_xlabel_edit": plot_xlabel_edit,
+        "plot_ylabel_edit": plot_ylabel_edit,
     }
 
     # 下拉框加入实验名称
