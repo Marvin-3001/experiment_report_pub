@@ -72,7 +72,7 @@
                     {"row": 0, "col": 6, "text": "14", "readonly": true},
                     {"row": 0, "col": 7, "text": "样品 1", "readonly": true},
                     {"row": 0, "col": 8, "text": "样品 2", "readonly": true},
-                    {"row": 1, "col": 0, "text": "lgCF-", "readonly": true},
+                    {"row": 1, "col": 0, "text": "lg[sub=C]F-", "readonly": true},
                     {"row": 2, "col": 0, "text": "电位mV", "readonly": true}
             ]
         },
@@ -132,8 +132,8 @@
                     "type": "grid_table",
                     "field_key": "fluoride_table",
                     "title": "",
-                    "col_widths_mm": [23, 18, 18, 18, 18, 18, 18, 20, 20],
-                    "row_heights_mm": [18, 10, 18],
+                    "col_widths_mm": [23, 16, 16, 16, 16, 16, 16, 18, 18],
+                    "row_heights_mm": [16, 12, 12],
                     "keep_together": true
                 },
                 "[indent=21]根据上述数据绘制标准曲线并查找样品的lgC[sub=F-]值。"

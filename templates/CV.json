@@ -159,8 +159,8 @@
             "type": "grid_table",
             "field_key": "cv_table",
             "title": "",
-            "col_widths_mm": [43, 24, 18, 18, 18, 18, 18, 20],
-            "row_heights_mm": [18, 12, 12, 12, 12, 12, 12],
+            "col_widths_mm": [36, 20, 16, 16, 16, 16, 16, 16],
+            "row_heights_mm": [16, 10, 10, 10, 10, 10, 10],
             "keep_together": true
                 }
             ]

@@ -280,6 +280,7 @@ def clear_plot(state):
 
     figure.clear()
     figure.add_subplot(111)
+    state["has_current_plot"] = False
     canvas.draw()
 
 # =========================================================
@@ -294,13 +295,13 @@ def change_experiment(state, experiment_name):
 
 
 # =========================================================
-# 点击“绘图”按钮时执行
+# 保存当前图像为报告图片变量
 # =========================================================
 def save_generated_plot_to_picture_store(state):
     """
-    每次绘图后，将当前 Matplotlib 图保存为一个可在报告正文中调用的图片变量。
+    将当前 Matplotlib 图保存为一个可在报告正文中调用的图片变量。
     规则：
-    1. {picture1}、{picture2}、{picture3} ... 分别对应每次点击“绘图”后保存的图片；
+    1. {picture1}、{picture2}、{picture3} ... 分别对应每次加入报告的图片；
     """
 
     APP_STATE["picture_counter"] += 1
@@ -316,6 +317,8 @@ def save_generated_plot_to_picture_store(state):
     APP_STATE["picture_sources"][picture_key] = str(
         state.get("current_experiment", "")
     ).strip()
+
+    return picture_key
 
 
 def is_import_picture_placeholder_key(key):
@@ -378,10 +381,31 @@ def plot_current_experiment(state):
         plot_func = config["plot_func"]
 
         plot_func(state)
-        save_generated_plot_to_picture_store(state)
+        state["has_current_plot"] = True
 
     except Exception as e:
+        state["has_current_plot"] = False
         QMessageBox.critical(state["window"], "错误", str(e))
+
+
+# =========================================================
+# 将当前图像加入报告图片变量
+# =========================================================
+def add_current_figure_to_report(state):
+    if not state.get("has_current_plot", False):
+        QMessageBox.warning(
+            state["window"],
+            "还没有可加入的图片",
+            "请先点击“绘图”生成图片。"
+        )
+        return
+
+    picture_key = save_generated_plot_to_picture_store(state)
+    QMessageBox.information(
+        state["window"],
+        "已加入报告图片",
+        f"已生成图片变量：{{{picture_key}}}"
+    )
 
 
 # =========================================================
@@ -904,6 +928,9 @@ def build_plot_window():
     btn_plot = QPushButton("绘图")
     control_layout.addWidget(btn_plot)
 
+    btn_add_to_report = QPushButton("加入报告图片")
+    control_layout.addWidget(btn_add_to_report)
+
     btn_clear = QPushButton("清空表格")
     control_layout.addWidget(btn_clear)
 
@@ -984,6 +1011,7 @@ def build_plot_window():
         "canvas": canvas,
         "experiments": experiments,
         "current_experiment": None,
+        "has_current_plot": False,
     }
 
     # 下拉框加入实验名称
@@ -992,6 +1020,7 @@ def build_plot_window():
     # 连接信号
     combo.currentTextChanged.connect(lambda text: change_experiment(state, text))
     btn_plot.clicked.connect(lambda: plot_current_experiment(state))
+    btn_add_to_report.clicked.connect(lambda: add_current_figure_to_report(state))
     btn_clear.clicked.connect(lambda: clear_all_cells(table))
     btn_save.clicked.connect(lambda: save_current_figure(state))
     table.itemChanged.connect(lambda item: auto_add_rows(table, item))
@@ -2572,7 +2601,7 @@ def build_report_hint_text():
                 lines.append(f"{{{key}}}：来源未知")
     else:
         lines.append("当前没有导入图片变量。")
-        lines.append("{import_picture1}、{import_picture2} 等变量会在点击“导入图片”后生成。")
+        lines.append("{import_picture1}、{import_picture2} 等变量会在点击“导入外部图片”后生成。")
 
     lines.append("")
     lines.append("【常用标记】")
