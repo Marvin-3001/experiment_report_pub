@@ -606,8 +606,6 @@ def build_report_hint_text(app_state=None):
     4. 图片插入提示。
     """
 
-    app_state = get_app_state(app_state)
-
     lines = ["【绘图图片变量】"]
 
     generated_pictures = app_state["generated_pictures"]
