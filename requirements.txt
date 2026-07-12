@@ -1,0 +1,7 @@
+# Runtime: Python 3.11+
+matplotlib==3.10.8
+numpy==2.4.4
+Pillow==12.2.0
+PyQt6==6.11.0
+reportlab==4.5.0
+scipy==1.17.1
