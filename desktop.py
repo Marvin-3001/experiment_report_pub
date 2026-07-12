@@ -1,11 +1,12 @@
 import sys
 from types import MethodType
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate, QTimer, Qt
 from matplotlib.figure import Figure
 from PyQt6.QtGui import QKeySequence, QShortcut
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from core import (APP_STATE,PLOT_CONFIG_DIR,TEMPLATE_DIR,build_report_hint_text,
+from core import (APP_STATE,CUSTOM_TEMPLATE_DIR,PLOT_CONFIG_DIR,TEMPLATE_DIR,build_report_hint_text,
                   expand_dimension_values,get_app_state,is_empty_form_value,
+                  get_template_dir_fingerprint,load_external_report_templates,
                   load_report_templates,plain_inline_markup_for_gui,
                   save_generated_plot_to_picture_store,save_import_picture_to_picture_store,)
 from PyQt6.QtWidgets import (QApplication,QComboBox,QDateEdit,QFileDialog,
@@ -17,7 +18,7 @@ from report import build_preview_text, generate_pdf, get_default_pdf_name
 from plotting import load_plot_experiment_configs, plot_experiment, read_numeric_rows, save_figure
 
 
-REPORT_TEMPLATES = load_report_templates(TEMPLATE_DIR)
+BUILTIN_REPORT_TEMPLATES = load_report_templates(TEMPLATE_DIR)
 
 
 def table_to_rows(table, required_cols=None):
@@ -766,13 +767,10 @@ def update_report_hint(hint_edit, app_state=None):
     hint_edit.setPlainText(build_report_hint_text(app_state))
 
 
-def update_preview(template_combo, input_widgets, preview_edit):
+def update_preview(template, input_widgets, preview_edit):
     """
     更新右侧预览框内容。
     """
-
-    template_name = template_combo.currentText()
-    template = REPORT_TEMPLATES[template_name]
 
     data = collect_form_data(
         template=template,
@@ -805,15 +803,12 @@ def choose_output_pdf_path(parent_window, default_filename):
     return output_path
 
 
-def export_pdf(parent_window, template_combo, input_widgets, app_state=None):
+def export_pdf(parent_window, template, input_widgets, app_state=None):
     """
     GUI 中点击“生成 PDF”按钮后执行的函数。
     """
 
     try:
-        template_name = template_combo.currentText()
-        template = REPORT_TEMPLATES[template_name]
-
         # 导出 PDF 时检查必填项
         data = collect_form_data(
             template=template,
@@ -1028,20 +1023,29 @@ def build_main_window(app_state=None):
     top_layout = QHBoxLayout()
     main_layout.addLayout(top_layout)
 
-    top_layout.addWidget(QLabel("报告模板："))
+    top_layout.addWidget(QLabel("内置模板："))
 
     template_combo = QComboBox()
-    template_combo.addItems(REPORT_TEMPLATES.keys())
-    top_layout.addWidget(template_combo)
+    template_combo.addItems(BUILTIN_REPORT_TEMPLATES.keys())
+    template_combo.setMinimumWidth(260)
+    top_layout.addWidget(template_combo, stretch=2)
+
+    top_layout.addWidget(QLabel("外部模板："))
+
+    external_template_combo = QComboBox()
+    external_template_combo.addItem("不使用外部模板")
+    external_template_combo.setMinimumWidth(210)
+    external_template_combo.setEnabled(False)
+    top_layout.addWidget(external_template_combo, stretch=2)
 
     import_picture_button = QPushButton("导入外部图片")
-    top_layout.addWidget(import_picture_button)
+    top_layout.addWidget(import_picture_button, stretch=1)
 
     preview_button = QPushButton("刷新预览")
-    top_layout.addWidget(preview_button)
+    top_layout.addWidget(preview_button, stretch=1)
 
     export_button = QPushButton("生成 PDF")
-    top_layout.addWidget(export_button)
+    top_layout.addWidget(export_button, stretch=1)
 
     # -------------------------------
     # 中间主体区域：左侧表单 + 右侧预览
@@ -1097,21 +1101,116 @@ def build_main_window(app_state=None):
     # 用字典保存输入控件
     input_widgets = {}
 
+    # 外部模板使用独立字典；活动模板保留快照，避免文件修改时清空正在填写的表单。
+    external_templates = {}
+    current_selection = {
+        "source": "builtin",
+        "name": template_combo.currentText(),
+        "template": BUILTIN_REPORT_TEMPLATES[template_combo.currentText()]
+    }
+    external_template_fingerprint: tuple | None = None
+    reported_external_template_errors: tuple | None = None
+
+    def get_current_template():
+        return current_selection["template"]
+
     def refresh_current_form():
         # 刷新当前模板对应的输入表单。
 
-        template_name = template_combo.currentText()
-        template = REPORT_TEMPLATES[template_name]
+        template = get_current_template()
 
         rebuild_form(form_layout, input_widgets, template)
-        update_preview(template_combo, input_widgets, preview_edit)
+        update_preview(template, input_widgets, preview_edit)
         update_report_hint(hint_edit, app_state)
 
     def refresh_current_preview():
         # 刷新右侧文本预览和提示信息。
 
-        update_preview(template_combo, input_widgets, preview_edit)
+        update_preview(get_current_template(), input_widgets, preview_edit)
         update_report_hint(hint_edit, app_state)
+
+    def select_builtin_template(template_name):
+        if not template_name or template_name not in BUILTIN_REPORT_TEMPLATES:
+            return
+
+        external_template_combo.blockSignals(True)
+        external_template_combo.setCurrentIndex(0)
+        external_template_combo.blockSignals(False)
+
+        current_selection.update({
+            "source": "builtin",
+            "name": template_name,
+            "template": BUILTIN_REPORT_TEMPLATES[template_name]
+        })
+        refresh_current_form()
+
+    def select_external_template(template_name):
+        if template_name not in external_templates:
+            if current_selection["source"] == "external":
+                select_builtin_template(template_combo.currentText())
+            return
+
+        current_selection.update({
+            "source": "external",
+            "name": template_name,
+            "template": external_templates[template_name]
+        })
+        refresh_current_form()
+
+    def show_external_template_errors(errors):
+        if not errors:
+            return
+
+        QMessageBox.warning(
+            window,
+            "外部模板加载失败",
+            "以下外部模板未能加载：\n" + "\n".join(errors)
+        )
+
+    def check_external_templates():
+        nonlocal external_templates
+        nonlocal external_template_fingerprint
+        nonlocal reported_external_template_errors
+
+        fingerprint = get_template_dir_fingerprint(CUSTOM_TEMPLATE_DIR)
+
+        if fingerprint == external_template_fingerprint:
+            return
+
+        external_template_fingerprint = fingerprint
+        loaded_templates, errors = load_external_report_templates(CUSTOM_TEMPLATE_DIR)
+        external_templates = loaded_templates
+
+        selected_external_name = None
+        if current_selection["source"] == "external":
+            selected_external_name = current_selection["name"]
+
+        external_template_combo.blockSignals(True)
+        external_template_combo.clear()
+        external_template_combo.addItem("不使用外部模板")
+        external_template_combo.addItems(external_templates.keys())
+        external_template_combo.setEnabled(bool(external_templates))
+
+        if selected_external_name in external_templates:
+            external_template_combo.setCurrentText(selected_external_name)
+        else:
+            external_template_combo.setCurrentIndex(0)
+
+        external_template_combo.blockSignals(False)
+
+        if selected_external_name and selected_external_name not in external_templates:
+            builtin_name = template_combo.currentText()
+            current_selection.update({
+                "source": "builtin",
+                "name": builtin_name,
+                "template": BUILTIN_REPORT_TEMPLATES[builtin_name]
+            })
+            refresh_current_form()
+
+        error_key = (fingerprint, tuple(errors))
+        if errors and error_key != reported_external_template_errors:
+            reported_external_template_errors = error_key
+            show_external_template_errors(errors)
 
     def import_pictures_from_files():
         # 从本地选择一张或多张图片，并生成 import_picture 数字变量。
@@ -1136,7 +1235,7 @@ def build_main_window(app_state=None):
                 # 每导入一张图片，就刷新一次提示区文本。
                 update_report_hint(hint_edit, app_state)
 
-            update_preview(template_combo, input_widgets, preview_edit)
+            update_preview(get_current_template(), input_widgets, preview_edit)
 
             if new_keys:
                 QMessageBox.information(
@@ -1155,12 +1254,12 @@ def build_main_window(app_state=None):
     def export_current_pdf():
         # 导出当前模板对应的 PDF。
 
-        export_pdf(window, template_combo, input_widgets, app_state)
+        export_pdf(window, get_current_template(), input_widgets, app_state)
 
     # 让外部窗口也能触发报告页刷新
     def refresh_report_page_from_outside():
         # 从其他标签页切换回来时，同时刷新报告预览和提示框。
-        update_preview(template_combo, input_widgets, preview_edit)
+        update_preview(get_current_template(), input_widgets, preview_edit)
         update_report_hint(hint_edit, app_state)
 
     window.refresh_report_page = refresh_report_page_from_outside
@@ -1168,13 +1267,23 @@ def build_main_window(app_state=None):
     # -------------------------------
     # 绑定按钮事件
     # -------------------------------
-    template_combo.currentTextChanged.connect(refresh_current_form)
+    template_combo.currentTextChanged.connect(select_builtin_template)
+    external_template_combo.currentTextChanged.connect(select_external_template)
     import_picture_button.clicked.connect(import_pictures_from_files)
     preview_button.clicked.connect(refresh_current_preview)
     export_button.clicked.connect(export_current_pdf)
 
     # 初始加载表单
     refresh_current_form()
+
+    # 运行期间自动发现新增、删除或修改的外部 JSON 模板。
+    external_template_timer = QTimer(window)
+    external_template_timer.setInterval(1000)
+    external_template_timer.timeout.connect(check_external_templates)
+    external_template_timer.start()
+    QTimer.singleShot(0, check_external_templates)
+
+    window.external_template_timer = external_template_timer
 
     return window
 

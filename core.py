@@ -1,6 +1,7 @@
 import json
 import re
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -115,6 +116,18 @@ PRESET_IMAGE_DIR = TEMPLATE_DIR / "image"
 PLOT_CONFIG_DIR = TEMPLATE_DIR / "plot_configs"
 
 
+def get_app_dir():
+    """返回源码目录，或打包后 EXE 所在目录。"""
+
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+
+    return Path(__file__).resolve().parent
+
+
+CUSTOM_TEMPLATE_DIR = get_app_dir() / "customer_templates"
+
+
 def get_app_state(app_state=None):
     if app_state is None:
         return APP_STATE
@@ -179,6 +192,58 @@ def load_report_templates(template_dir: str | Path = "templates") -> dict:
         templates[template_name] = template_data
 
     return templates
+
+
+def get_template_dir_fingerprint(template_dir: str | Path):
+    """获取模板目录状态，仅在 JSON 文件发生变化时触发重新加载。"""
+
+    template_dir = Path(template_dir)
+
+    if not template_dir.is_dir():
+        return ()
+
+    fingerprint = []
+
+    for json_path in sorted(template_dir.glob("*.json")):
+        try:
+            file_stat = json_path.stat()
+            fingerprint.append((json_path.name, file_stat.st_mtime_ns, file_stat.st_size))
+        except OSError:
+            fingerprint.append((json_path.name, None, None))
+
+    return tuple(fingerprint)
+
+
+def load_external_report_templates(template_dir: str | Path = CUSTOM_TEMPLATE_DIR):
+    """容错读取外部 JSON 模板，返回模板字典和错误信息列表。"""
+
+    template_dir = Path(template_dir)
+    templates = {}
+    errors = []
+
+    if not template_dir.is_dir():
+        return templates, errors
+
+    for json_path in sorted(template_dir.glob("*.json")):
+        try:
+            template_name, template_data = load_single_template(json_path)
+
+            if not isinstance(template_data, dict):
+                raise ValueError("JSON 顶层必须是对象")
+
+            if not isinstance(template_name, str):
+                raise ValueError("template_name 必须是字符串")
+
+            template_name = template_name.strip()
+
+            if template_name in templates:
+                raise ValueError(f"模板名称重复：{template_name}")
+
+            templates[template_name] = template_data
+        except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError, AttributeError) as error:
+            errors.append(f"{json_path.name}：{error}")
+
+    return templates, errors
 
 def is_import_picture_placeholder_key(key):
     """
